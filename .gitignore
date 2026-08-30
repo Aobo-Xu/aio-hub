@@ -70,3 +70,6 @@ cache
 .snow
 
 .tmp
+
+# Local Git worktrees
+/.worktrees/

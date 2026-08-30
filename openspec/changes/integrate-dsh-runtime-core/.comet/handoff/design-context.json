@@ -1,0 +1,16 @@
+{
+  "change": "integrate-dsh-runtime-core",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "5cb5d7556e56955b3114c8ced5fa32fac3cfa73582c01dcfd8b086f5af14751b",
+  "files": [
+    { "path": "openspec/changes/integrate-dsh-runtime-core/proposal.md", "sha256": "fd19584e71354c662724109b72bfb942acef4cd0cc26b5fa40a3c7749c4db4a2" },
+    { "path": "openspec/changes/integrate-dsh-runtime-core/design.md", "sha256": "b345290e51f8067a5f1caf422f255aa806a182f66686515fc61aa5d853014a2f" },
+    { "path": "openspec/changes/integrate-dsh-runtime-core/tasks.md", "sha256": "ca5fcf0d2c13a80d9ded3fbf117aa26e9e4639eb79bc686456c64d220260e9fa" },
+    { "path": "openspec/changes/integrate-dsh-runtime-core/specs/dsh-execution-bridge/spec.md", "sha256": "a2edede1dcbdb11c773f1f79047c9799d4f8a8f3d5740a10561afb3c24061871" },
+    { "path": "openspec/changes/integrate-dsh-runtime-core/specs/dsh-model-and-prompt-sync/spec.md", "sha256": "75015151770fa9785cbdd5093e63367a18d04aaaf55545988fecf91ef7d9bb8e" },
+    { "path": "openspec/changes/integrate-dsh-runtime-core/specs/dsh-runtime-lifecycle/spec.md", "sha256": "5e064a600ec0f44a4361a61fc067f73e7a7d46e3351edf4f00b1a4b2bb0cb304" }
+  ]
+}
