@@ -1,0 +1,187 @@
+name: DSH Runtime Native E2E
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build verified DSH release ZIP
+    runs-on: windows-latest
+    steps:
+      - name: Check out plugin repository
+        uses: actions/checkout@v4
+        with:
+          repository: miaotouy/aiohub-plugin-dsh-workspace
+          ref: 612c3c8a4bf63209c9e8570b93e0241c814f4659
+          path: plugin
+
+      - name: Check out pinned DSH source
+        uses: actions/checkout@v4
+        with:
+          repository: deepseek-ai/deepseek-harness
+          ref: db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5
+          path: dsh-source
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./plugin -> target
+
+      - name: Install plugin dependencies
+        working-directory: plugin
+        run: bun install --frozen-lockfile
+
+      - name: Build protocol and manifest-selected Supervisor
+        working-directory: plugin
+        run: >-
+          bun run build:protocol &&
+          cargo build -p aio-dsh-supervisor --release
+
+      - name: Build pinned DSH runtime from official source
+        working-directory: plugin
+        run: >-
+          bun run build:dsh-source
+          --source-root ../dsh-source
+          --platform win32-x64
+          --out .artifacts/runtime
+
+      - name: Package offline win32-x64 ZIP
+        working-directory: plugin
+        run: bun run package:platform
+
+      - name: Verify release metadata
+        working-directory: plugin
+        run: bun scripts/verify-release.ts
+
+      - name: Upload release ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-coding-workspace-win32-x64
+          path: |
+            plugin/dist/*.zip
+            plugin/dist/*.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  native-e2e:
+    name: Windows native E2E (offline)
+    runs-on: windows-latest
+    needs: package
+    env:
+      AIO_E2E_BINARY: ${{ github.workspace }}/src-tauri/target/debug/aiohub.exe
+      AIO_E2E_FRONTEND_URL: http://localhost:1420/
+      AIO_E2E_DATA_DIR: ${{ github.workspace }}/.e2e-data/dsh-native
+      AIO_E2E_ID_SUFFIX: dsh-native-ci
+      AIO_E2E_ARTIFACT_DIR: ${{ github.workspace }}/.e2e-artifacts/dsh-native
+      AIO_E2E_WEBDRIVER_PORT: "4459"
+      AIO_E2E_DSH_PLUGIN_ZIP: ${{ github.workspace }}/.e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip
+      AIO_E2E_OFFLINE_RUNTIME: "1"
+      AIO_E2E_EDGE_DRIVER_DIR: ${{ github.workspace }}/.e2e-driver
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./src-tauri -> target
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build frontend
+        run: bun run build:vite
+
+      - name: Build debug application binary
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
+      - name: Download release ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: dsh-coding-workspace-win32-x64
+          path: .e2e-runtime
+
+      - name: Verify release ZIP checksum
+        shell: pwsh
+        run: |
+          $checksum = Get-Content ".e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip.sha256"
+          $expected = ($checksum -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash ".e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "release ZIP checksum mismatch: $actual != $expected" }
+
+      - name: Pre-download matching Edge WebDriver
+        shell: pwsh
+        run: |
+          $edge = (Get-Item "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion
+          $url = "https://msedgedriver.microsoft.com/$edge/edgedriver_win64.zip"
+          New-Item -ItemType Directory -Force $env:AIO_E2E_EDGE_DRIVER_DIR | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip"
+          Expand-Archive "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip" -DestinationPath $env:AIO_E2E_EDGE_DRIVER_DIR -Force
+          Remove-Item "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip"
+          if (-not (Test-Path "$env:AIO_E2E_EDGE_DRIVER_DIR/msedgedriver.exe")) { throw "Edge WebDriver download failed for $edge" }
+
+      - name: Deny outbound traffic for the test stage
+        shell: pwsh
+        run: |
+          netsh advfirewall firewall add rule name="AIO-DSH-E2E-OFFLINE" dir=out action=block remoteip=any
+          if ($LASTEXITCODE -ne 0) { throw "failed to install the offline firewall rule" }
+
+      - name: Run offline native E2E
+        shell: pwsh
+        run: bun run test:tauri:e2e -- --preset dsh-runtime-native
+
+      - name: Restore outbound traffic
+        if: always()
+        shell: pwsh
+        run: |
+          netsh advfirewall firewall delete rule name="AIO-DSH-E2E-OFFLINE"
+
+      - name: Upload redacted test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-native-e2e-reports
+          path: |
+            .e2e-artifacts/dsh-native/**/*.log
+            .e2e-artifacts/dsh-native/**/*.json
+          if-no-files-found: warn
+          retention-days: 7
