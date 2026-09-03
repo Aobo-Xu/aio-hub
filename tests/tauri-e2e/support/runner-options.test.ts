@@ -63,6 +63,13 @@ describe("Tauri E2E runner options", () => {
         "tests/tauri-e2e/specs/recall-pipeline.spec.ts",
       ],
     });
+    expect(
+      parseE2eRunnerOptions(["--preset", "dsh-runtime-native"], {})
+    ).toEqual({
+      ...deterministicDefaults,
+      presetId: "dsh-runtime-native",
+      wdioArgs: ["--spec", "tests/tauri-e2e/specs/dsh-plugin-release.spec.ts"],
+    });
     expect(parseE2eRunnerOptions(["--preset", "recall-curated"], {})).toEqual({
       ...deterministicDefaults,
       presetId: "recall-curated",

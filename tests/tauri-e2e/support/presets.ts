@@ -11,6 +11,7 @@ export type E2ePresetId =
   | "migration-minimal"
   | "migration-cleanup"
   | "guided-flow-baseline"
+  | "dsh-runtime-native"
   | "native";
 
 export interface E2ePresetPrerequisite {
@@ -45,6 +46,7 @@ const GUIDED_FLOW_BASELINE_SPEC =
   "tests/tauri-e2e/specs/guided-flow-unknown-baseline.spec.ts";
 const GUIDED_FLOW_BASELINE_RECOVERY_SPEC =
   "tests/tauri-e2e/specs/guided-flow-unknown-baseline-recovery.spec.ts";
+const DSH_RELEASE_SPEC = "tests/tauri-e2e/specs/dsh-plugin-release.spec.ts";
 
 const OLLAMA_EMBEDDING_PREREQUISITE: E2ePresetPrerequisite = {
   env: "AIO_E2E_OLLAMA_MODEL",
@@ -58,6 +60,21 @@ export const E2E_PRESETS: readonly E2ePreset[] = [
     purpose: "Deterministic Recall retrieval pipeline compile, run, and trace",
     args: ["--spec", PIPELINE_SPEC],
     prerequisites: [],
+    runtimeRequirements: [],
+    includesRestart: false,
+  },
+  {
+    id: "dsh-runtime-native",
+    purpose:
+      "DSH release plugin native install, resident session turn, and lifecycle",
+    args: ["--spec", DSH_RELEASE_SPEC],
+    prerequisites: [
+      {
+        env: "AIO_E2E_DSH_PLUGIN_ZIP",
+        missing: "skip",
+        description: "Absolute path to the final DSH release ZIP",
+      },
+    ],
     runtimeRequirements: [],
     includesRestart: false,
   },

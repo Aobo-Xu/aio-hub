@@ -38,6 +38,20 @@ const embeddedPort = Number(
     process.env.TAURI_WEBDRIVER_PORT ??
     4400 + (process.pid % 1000)
 );
+const offlineRuntime = process.env.AIO_E2E_OFFLINE_RUNTIME === "1";
+const edgeDriverDir = process.env.AIO_E2E_EDGE_DRIVER_DIR?.trim();
+if (offlineRuntime && process.platform === "win32") {
+  if (!edgeDriverDir) {
+    throw new Error(
+      "AIO_E2E_EDGE_DRIVER_DIR is required when AIO_E2E_OFFLINE_RUNTIME=1."
+    );
+  }
+  const edgeDriver = path.join(edgeDriverDir, "msedgedriver.exe");
+  if (!fs.existsSync(edgeDriver)) {
+    throw new Error(`Offline Edge WebDriver is missing: ${edgeDriver}`);
+  }
+  process.env.PATH = `${edgeDriverDir};${process.env.PATH ?? ""}`;
+}
 const appEnv = {
   AIO_ID_SUFFIX: runSuffix,
   AIO_DATA_DIR: dataDir,
@@ -65,13 +79,11 @@ process.env.AIO_DATA_DIR ??= dataDir;
 export const config: WebdriverIO.Config = {
   runner: "local",
   specs: [
-    [
-      path.join(projectRoot, "tests", "tauri-e2e", "specs", "**", "*.spec.ts"),
-    ],
+    [path.join(projectRoot, "tests", "tauri-e2e", "specs", "**", "*.spec.ts")],
   ],
   maxInstances: 1,
   maxInstancesPerCapability: 1,
-  logLevel: "warn",
+  logLevel: process.env.AIO_E2E_WDIO_LOG_LEVEL ?? "warn",
   outputDir: artifactDir,
   services: [
     [
@@ -85,6 +97,10 @@ export const config: WebdriverIO.Config = {
         captureFrontendLogs: true,
         backendLogLevel: "debug",
         frontendLogLevel: "info",
+        // Driver acquisition is an online preparation concern. The native
+        // release lane supplies a version-matched driver before it disables
+        // outbound traffic for the actual application test process.
+        autoDownloadEdgeDriver: !offlineRuntime,
         commandTimeout: 30_000,
         startTimeout: 60_000,
       },
@@ -93,6 +109,12 @@ export const config: WebdriverIO.Config = {
   capabilities: [
     {
       browserName: "tauri",
+      // The service removes the pseudo `tauri` browserName before it reaches
+      // the worker. Keep the embedded endpoint on the capability so WDIO 9
+      // can create the native session without treating the whole run as an
+      // externally managed WebDriver server.
+      hostname: "127.0.0.1",
+      port: embeddedPort,
       "tauri:options": {
         application: appBinaryPath,
       },
@@ -102,9 +124,7 @@ export const config: WebdriverIO.Config = {
   mochaOpts: {
     ui: "bdd",
     timeout:
-      process.env.AIO_E2E_CORPUS_MODE === "external-full"
-        ? 600_000
-        : 120_000,
+      process.env.AIO_E2E_CORPUS_MODE === "external-full" ? 600_000 : 120_000,
   },
   reporters: ["spec"],
   waitforTimeout: 10_000,
@@ -155,7 +175,10 @@ export const config: WebdriverIO.Config = {
             document.querySelectorAll(".base-dialog-backdrop")
           ).some(isVisible);
         })),
-      { timeout: 5_000, timeoutMsg: "Transient dialog remained open after test" }
+      {
+        timeout: 5_000,
+        timeoutMsg: "Transient dialog remained open after test",
+      }
     );
   },
 };
