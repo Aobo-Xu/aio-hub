@@ -290,6 +290,9 @@
     "@lezer/lr": "^1.4.2",
     "@lezer/highlight": "^1.2.1"
   },
+  "patchedDependencies": {
+    "@wdio/tauri-service@1.1.0": "patches/@wdio__tauri-service@1.1.0.patch"
+  },
   "trustedDependencies": [
     "esbuild",
     "vue-demi",

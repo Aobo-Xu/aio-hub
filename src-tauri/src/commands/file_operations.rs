@@ -1610,8 +1610,27 @@ pub async fn uninstall_plugin(app: AppHandle, plugin_id: String) -> Result<Strin
         return Err(format!("插件目录不存在: {}", plugin_id));
     }
 
-    // 使用 trash crate 移到回收站
-    trash::delete(&plugin_dir).map_err(|e| format!("移入回收站失败: {}", e))?;
+    // Windows 进程退出后句柄释放可能略晚于 child.wait；对回收站移动做有界重试，
+    // 保持可恢复卸载语义，不退化为直接删除。
+    let mut last_error = None;
+    const TRASH_ATTEMPTS: usize = 10;
+    for attempt in 0..TRASH_ATTEMPTS {
+        match trash::delete(&plugin_dir) {
+            Ok(()) => {
+                last_error = None;
+                break;
+            }
+            Err(error) => {
+                last_error = Some(error);
+                if attempt + 1 < TRASH_ATTEMPTS {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+            }
+        }
+    }
+    if let Some(error) = last_error {
+        return Err(format!("移入回收站失败: {}", error));
+    }
 
     Ok(format!("插件 {} 已移入回收站", plugin_id))
 }
@@ -1933,6 +1952,355 @@ pub async fn preflight_plugin_zip(zip_path: String) -> Result<PluginManifest, St
     validate_plugin_archive_platform(&mut archive, &plugin_manifest)?;
 
     Ok(plugin_manifest)
+}
+
+const PLUGIN_UPGRADE_STAGING_DIR: &str = "plugin-upgrade-staging";
+const PLUGIN_UPGRADE_TRANSACTION_FILE: &str = "transaction.json";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginUpgradeStage {
+    pub transaction_id: String,
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub version: String,
+    pub candidate_path: String,
+    pub current_path: String,
+    pub probe_plugin_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginUpgradeTransaction {
+    plugin_id: String,
+    plugin_name: String,
+    version: String,
+}
+
+fn validate_plugin_id(plugin_id: &str) -> Result<(), String> {
+    if plugin_id.is_empty()
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+        || plugin_id.contains("..")
+    {
+        return Err(format!("非法的插件 ID: {plugin_id}"));
+    }
+    Ok(())
+}
+
+fn extract_upgrade_candidate(zip_path: &Path, candidate_dir: &Path) -> Result<(), String> {
+    let file = fs::File::open(zip_path).map_err(|error| format!("无法打开 ZIP 文件: {error}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("无法读取 ZIP 文件: {error}"))?;
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| format!("读取 ZIP 条目失败: {error}"))?;
+        let entry_name = entry.name().replace('\\', "/");
+        if entry_name.starts_with('.') || entry_name.contains("/.") {
+            continue;
+        }
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or_else(|| format!("ZIP 文件包含非法路径: {}", entry.name()))?
+            .to_path_buf();
+        if let Some(mode) = entry.unix_mode() {
+            let file_type = mode & 0o170000;
+            if file_type != 0 && file_type != 0o040000 && file_type != 0o100000 {
+                return Err(format!("ZIP 文件包含不支持的特殊文件: {}", entry.name()));
+            }
+        }
+
+        let target = candidate_dir.join(enclosed);
+        if entry.is_dir() {
+            fs::create_dir_all(&target).map_err(|error| format!("创建目录失败: {error}"))?;
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("创建目录失败: {error}"))?;
+        }
+        let mut output =
+            fs::File::create(&target).map_err(|error| format!("创建文件失败: {error}"))?;
+        std::io::copy(&mut entry, &mut output).map_err(|error| format!("写入文件失败: {error}"))?;
+    }
+    Ok(())
+}
+
+fn plugin_upgrade_transaction_root(
+    app_data_dir: &Path,
+    transaction_id: &str,
+) -> Result<PathBuf, String> {
+    let parsed = uuid::Uuid::parse_str(transaction_id)
+        .map_err(|_| format!("非法的插件升级事务 ID: {transaction_id}"))?;
+    if parsed.to_string() != transaction_id {
+        return Err(format!("非法的插件升级事务 ID: {transaction_id}"));
+    }
+    Ok(app_data_dir
+        .join(PLUGIN_UPGRADE_STAGING_DIR)
+        .join(transaction_id))
+}
+
+fn upgrade_probe_plugin_id(plugin_id: &str, transaction_id: &str) -> String {
+    format!("{plugin_id}-upgrade-probe-{transaction_id}")
+}
+
+fn finalize_plugin_upgrade_paths(
+    app_data_dir: &Path,
+    transaction_id: &str,
+    accept: bool,
+) -> Result<PluginInstallResult, String> {
+    let transaction_root = plugin_upgrade_transaction_root(app_data_dir, transaction_id)?;
+    let metadata_path = transaction_root.join(PLUGIN_UPGRADE_TRANSACTION_FILE);
+    let transaction: PluginUpgradeTransaction = serde_json::from_slice(
+        &fs::read(&metadata_path).map_err(|error| format!("读取插件升级事务失败: {error}"))?,
+    )
+    .map_err(|error| format!("解析插件升级事务失败: {error}"))?;
+    validate_plugin_id(&transaction.plugin_id)?;
+
+    let current_path = app_data_dir.join("plugins").join(&transaction.plugin_id);
+    if !current_path.exists() {
+        return Err(format!("当前插件目录不存在: {}", current_path.display()));
+    }
+
+    let probe_data_path = app_data_dir
+        .join("plugins-data")
+        .join(upgrade_probe_plugin_id(
+            &transaction.plugin_id,
+            transaction_id,
+        ));
+    if probe_data_path.exists() {
+        fs::remove_dir_all(&probe_data_path)
+            .map_err(|error| format!("清理升级探针数据失败: {error}"))?;
+    }
+
+    if !accept {
+        fs::remove_dir_all(&transaction_root)
+            .map_err(|error| format!("清理候选插件失败: {error}"))?;
+        return Ok(PluginInstallResult {
+            plugin_id: transaction.plugin_id,
+            plugin_name: transaction.plugin_name,
+            version: transaction.version,
+            install_path: current_path.to_string_lossy().to_string(),
+        });
+    }
+
+    let candidate_path = transaction_root.join("candidate");
+    if !candidate_path.exists() {
+        return Err(format!("候选插件目录不存在: {}", candidate_path.display()));
+    }
+    let plugins_root = app_data_dir.join("plugins");
+    let prepared_path = plugins_root.join(format!(
+        ".{}-upgrade-prepared-{transaction_id}",
+        transaction.plugin_id
+    ));
+    let previous_path = plugins_root.join(format!(
+        ".{}-upgrade-previous-{transaction_id}",
+        transaction.plugin_id
+    ));
+    fs::create_dir_all(&prepared_path).map_err(|error| format!("创建升级准备目录失败: {error}"))?;
+    let mut copy_options = fs_extra::dir::CopyOptions::new();
+    copy_options.content_only = true;
+    copy_options.overwrite = true;
+    if let Err(error) = fs_extra::dir::copy(&candidate_path, &prepared_path, &copy_options) {
+        let _ = fs::remove_dir_all(&prepared_path);
+        return Err(format!("复制已验证候选插件失败: {error}"));
+    }
+
+    if let Err(error) = fs::rename(&current_path, &previous_path) {
+        let _ = fs::remove_dir_all(&prepared_path);
+        return Err(format!("暂存当前插件失败: {error}"));
+    }
+    if let Err(error) = fs::rename(&prepared_path, &current_path) {
+        let rollback = fs::rename(&previous_path, &current_path);
+        let _ = fs::remove_dir_all(&prepared_path);
+        return match rollback {
+            Ok(()) => Err(format!("启用候选插件失败，已恢复最后可用版本: {error}")),
+            Err(rollback_error) => Err(format!(
+                "启用候选插件失败: {error}; 恢复最后可用版本也失败: {rollback_error}"
+            )),
+        };
+    }
+
+    if let Err(error) = fs::remove_dir_all(&previous_path) {
+        log::warn!(
+            "插件 {} 升级成功，但清理旧 payload 失败: {}",
+            transaction.plugin_id,
+            error
+        );
+    }
+    if let Err(error) = fs::remove_dir_all(&transaction_root) {
+        log::warn!(
+            "插件 {} 升级成功，但清理候选事务失败: {}",
+            transaction.plugin_id,
+            error
+        );
+    }
+    Ok(PluginInstallResult {
+        plugin_id: transaction.plugin_id,
+        plugin_name: transaction.plugin_name,
+        version: transaction.version,
+        install_path: current_path.to_string_lossy().to_string(),
+    })
+}
+
+/// 将升级 ZIP 解压到隔离候选目录。调用方必须先通过 resident Sidecar IPC
+/// 使用 `probe_plugin_id` 完成 initialize/ready 冒烟，再调用 finalize 接受候选。
+#[tauri::command]
+pub async fn stage_plugin_upgrade_from_zip(
+    app: AppHandle,
+    zip_path: String,
+) -> Result<PluginUpgradeStage, String> {
+    let manifest = preflight_plugin_zip(zip_path.clone()).await?;
+    validate_plugin_id(&manifest.id)?;
+    let app_data_dir = crate::get_app_data_dir(app.config());
+    let current_path = app_data_dir.join("plugins").join(&manifest.id);
+    if !current_path.exists() {
+        return Err(format!("插件 {} 尚未安装，不能执行升级", manifest.id));
+    }
+
+    let transaction_id = uuid::Uuid::new_v4().to_string();
+    let transaction_root = plugin_upgrade_transaction_root(&app_data_dir, &transaction_id)?;
+    let candidate_path = transaction_root.join("candidate");
+    fs::create_dir_all(&candidate_path).map_err(|error| format!("创建候选目录失败: {error}"))?;
+    if let Err(error) = extract_upgrade_candidate(Path::new(&zip_path), &candidate_path) {
+        let _ = fs::remove_dir_all(&transaction_root);
+        return Err(error);
+    }
+
+    let transaction = PluginUpgradeTransaction {
+        plugin_id: manifest.id.clone(),
+        plugin_name: manifest.name.clone(),
+        version: manifest.version.clone(),
+    };
+    if let Err(error) = fs::write(
+        transaction_root.join(PLUGIN_UPGRADE_TRANSACTION_FILE),
+        serde_json::to_vec_pretty(&transaction)
+            .map_err(|error| format!("序列化插件升级事务失败: {error}"))?,
+    ) {
+        let _ = fs::remove_dir_all(&transaction_root);
+        return Err(format!("写入插件升级事务失败: {error}"));
+    }
+
+    Ok(PluginUpgradeStage {
+        transaction_id: transaction_id.clone(),
+        plugin_id: manifest.id.clone(),
+        plugin_name: manifest.name,
+        version: manifest.version,
+        candidate_path: candidate_path.to_string_lossy().to_string(),
+        current_path: current_path.to_string_lossy().to_string(),
+        probe_plugin_id: upgrade_probe_plugin_id(&manifest.id, &transaction_id),
+    })
+}
+
+/// 接受已通过 resident 冒烟的候选，或在失败时丢弃候选并保留当前安装。
+#[tauri::command]
+pub async fn finalize_plugin_upgrade(
+    app: AppHandle,
+    transaction_id: String,
+    accept: bool,
+) -> Result<PluginInstallResult, String> {
+    let app_data_dir = crate::get_app_data_dir(app.config());
+    finalize_plugin_upgrade_paths(&app_data_dir, &transaction_id, accept)
+}
+
+#[cfg(test)]
+mod plugin_upgrade_transaction_tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn write_transaction(app_data_dir: &Path, transaction_id: &str, plugin_id: &str) -> PathBuf {
+        let transaction_root = app_data_dir
+            .join("plugin-upgrade-staging")
+            .join(transaction_id);
+        fs::create_dir_all(transaction_root.join("candidate")).unwrap();
+        fs::write(
+            transaction_root.join("transaction.json"),
+            serde_json::to_vec(&PluginUpgradeTransaction {
+                plugin_id: plugin_id.to_string(),
+                plugin_name: "Test Plugin".to_string(),
+                version: "2.0.0".to_string(),
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        transaction_root
+    }
+
+    #[test]
+    fn rejecting_a_staged_upgrade_preserves_the_current_install() {
+        let root = tempdir().unwrap();
+        let current = root.path().join("plugins").join("test-plugin");
+        fs::create_dir_all(&current).unwrap();
+        fs::write(current.join("version.txt"), "1.0.0").unwrap();
+        let transaction_id = uuid::Uuid::new_v4().to_string();
+        let transaction_root = write_transaction(root.path(), &transaction_id, "test-plugin");
+        fs::write(transaction_root.join("candidate/version.txt"), "2.0.0").unwrap();
+        let probe_data = root
+            .path()
+            .join("plugins-data")
+            .join(format!("test-plugin-upgrade-probe-{transaction_id}"));
+        fs::create_dir_all(&probe_data).unwrap();
+
+        finalize_plugin_upgrade_paths(root.path(), &transaction_id, false).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(current.join("version.txt")).unwrap(),
+            "1.0.0"
+        );
+        assert!(!transaction_root.exists());
+        assert!(!probe_data.exists());
+    }
+
+    #[test]
+    fn failed_candidate_swap_restores_the_last_good_install() {
+        let root = tempdir().unwrap();
+        let current = root.path().join("plugins").join("test-plugin");
+        fs::create_dir_all(&current).unwrap();
+        fs::write(current.join("version.txt"), "1.0.0").unwrap();
+        let transaction_id = uuid::Uuid::new_v4().to_string();
+        let transaction_root = write_transaction(root.path(), &transaction_id, "test-plugin");
+        fs::remove_dir_all(transaction_root.join("candidate")).unwrap();
+
+        let error = match finalize_plugin_upgrade_paths(root.path(), &transaction_id, true) {
+            Ok(_) => panic!("缺失候选目录时不应接受升级"),
+            Err(error) => error,
+        };
+
+        assert!(error.contains("候选插件目录不存在"));
+        assert_eq!(
+            fs::read_to_string(current.join("version.txt")).unwrap(),
+            "1.0.0"
+        );
+    }
+
+    #[test]
+    fn accepting_a_verified_candidate_replaces_only_the_plugin_payload() {
+        let root = tempdir().unwrap();
+        let current = root.path().join("plugins").join("test-plugin");
+        let data = root.path().join("plugins-data").join("test-plugin");
+        fs::create_dir_all(&current).unwrap();
+        fs::create_dir_all(&data).unwrap();
+        fs::write(current.join("version.txt"), "1.0.0").unwrap();
+        fs::write(data.join("session.json"), "preserved").unwrap();
+        let transaction_id = uuid::Uuid::new_v4().to_string();
+        let transaction_root = write_transaction(root.path(), &transaction_id, "test-plugin");
+        fs::write(transaction_root.join("candidate/version.txt"), "2.0.0").unwrap();
+
+        let result = finalize_plugin_upgrade_paths(root.path(), &transaction_id, true).unwrap();
+
+        assert_eq!(result.plugin_id, "test-plugin");
+        assert_eq!(result.version, "2.0.0");
+        assert_eq!(
+            fs::read_to_string(current.join("version.txt")).unwrap(),
+            "2.0.0"
+        );
+        assert_eq!(
+            fs::read_to_string(data.join("session.json")).unwrap(),
+            "preserved"
+        );
+        assert!(!transaction_root.exists());
+    }
 }
 
 // Tauri 命令：读取应用数据目录下的二进制文件

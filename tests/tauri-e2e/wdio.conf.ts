@@ -55,6 +55,9 @@ if (offlineRuntime && process.platform === "win32") {
 const appEnv = {
   AIO_ID_SUFFIX: runSuffix,
   AIO_DATA_DIR: dataDir,
+  ...(process.env.AIO_DSH_E2E_CRASH_TOKEN
+    ? { AIO_DSH_E2E_CRASH_TOKEN: process.env.AIO_DSH_E2E_CRASH_TOKEN }
+    : {}),
   ...(process.env.AIO_E2E_MOCK_BASE_URL
     ? { AIO_E2E_MOCK_BASE_URL: process.env.AIO_E2E_MOCK_BASE_URL }
     : {}),

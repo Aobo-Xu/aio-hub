@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { formatPresetList, parseE2eRunnerOptions } from "./runner-options";
+import {
+  formatPresetList,
+  parseE2eRunnerOptions,
+  resolveFrontendServerMode,
+} from "./runner-options";
+
+describe("frontend server mode", () => {
+  it("serves the prebuilt frontend for the offline DSH native lane", () => {
+    expect(resolveFrontendServerMode("dsh-runtime-native")).toBe("preview");
+    expect(resolveFrontendServerMode("recall-pipeline")).toBe("development");
+    expect(resolveFrontendServerMode(undefined)).toBe("development");
+  });
+});
 import { E2E_PRESETS, missingPresetPrerequisites } from "./presets";
 
 describe("Tauri E2E runner options", () => {
@@ -58,10 +70,7 @@ describe("Tauri E2E runner options", () => {
     expect(parseE2eRunnerOptions(["--preset", "recall-pipeline"], {})).toEqual({
       ...deterministicDefaults,
       presetId: "recall-pipeline",
-      wdioArgs: [
-        "--spec",
-        "tests/tauri-e2e/specs/recall-pipeline.spec.ts",
-      ],
+      wdioArgs: ["--spec", "tests/tauri-e2e/specs/recall-pipeline.spec.ts"],
     });
     expect(
       parseE2eRunnerOptions(["--preset", "dsh-runtime-native"], {})

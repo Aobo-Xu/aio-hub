@@ -1,6 +1,7 @@
 name: DSH Runtime Native E2E
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main, dev]
   push:
@@ -10,15 +11,29 @@ permissions:
   contents: read
 
 jobs:
-  package:
-    name: Build verified DSH release ZIP
+  native-e2e:
+    name: Windows native E2E (offline)
     runs-on: windows-latest
+    env:
+      AIO_E2E_BINARY: ${{ github.workspace }}/src-tauri/target/debug/aiohub.exe
+      AIO_E2E_FRONTEND_URL: http://localhost:1420/
+      AIO_E2E_DATA_DIR: ${{ github.workspace }}/.e2e-data/dsh-native
+      AIO_E2E_ID_SUFFIX: dsh-native-ci
+      AIO_E2E_ARTIFACT_DIR: ${{ github.workspace }}/.e2e-artifacts/dsh-native
+      AIO_E2E_WEBDRIVER_PORT: "4459"
+      AIO_E2E_DSH_PLUGIN_ZIP: ${{ github.workspace }}/plugin/dist/dsh-coding-workspace-0.1.0-win32-x64.zip
+      AIO_E2E_OFFLINE_RUNTIME: "1"
+      AIO_E2E_EDGE_DRIVER_DIR: ${{ github.workspace }}/.e2e-driver
+      AIO_E2E_FIREWALL_RULE: AIO-DSH-E2E-OFFLINE-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Check out AIO repository
+        uses: actions/checkout@v4
+
       - name: Check out plugin repository
         uses: actions/checkout@v4
         with:
-          repository: miaotouy/aiohub-plugin-dsh-workspace
-          ref: 612c3c8a4bf63209c9e8570b93e0241c814f4659
+          repository: Aobo-Xu/aiohub-plugin-dsh-workspace
+          ref: 12612fc8954555cbb91d2f8401d43e3ab59fb477
           path: plugin
 
       - name: Check out pinned DSH source
@@ -48,14 +63,29 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Set up Rust
+      - name: Set up Rust 1.89.0
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.89.0
+
+      - name: Locate libclang
+        shell: pwsh
+        run: |
+          $llvmBin = Join-Path $env:ProgramFiles "LLVM\bin"
+          if (-not (Test-Path (Join-Path $llvmBin "libclang.dll"))) {
+            throw "windows-latest does not provide libclang.dll at $llvmBin"
+          }
+          "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
+            ./src-tauri -> target
             ./plugin -> target
+
+      - name: Install AIO dependencies
+        run: bun install --frozen-lockfile
 
       - name: Install plugin dependencies
         working-directory: plugin
@@ -83,70 +113,31 @@ jobs:
         working-directory: plugin
         run: bun scripts/verify-release.ts
 
-      - name: Upload release ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: dsh-coding-workspace-win32-x64
-          path: |
-            plugin/dist/*.zip
-            plugin/dist/*.zip.sha256
-          if-no-files-found: error
-          retention-days: 7
+      - name: Run ZIP contract and executable smoke
+        working-directory: plugin
+        run: >-
+          bunx vitest run
+          tests/e2e/installed-plugin.test.ts
+          tests/e2e/runtime-artifact.test.ts &&
+          cargo test -p aio-dsh-supervisor --test stdio_abi
 
-  native-e2e:
-    name: Windows native E2E (offline)
-    runs-on: windows-latest
-    needs: package
-    env:
-      AIO_E2E_BINARY: ${{ github.workspace }}/src-tauri/target/debug/aiohub.exe
-      AIO_E2E_FRONTEND_URL: http://localhost:1420/
-      AIO_E2E_DATA_DIR: ${{ github.workspace }}/.e2e-data/dsh-native
-      AIO_E2E_ID_SUFFIX: dsh-native-ci
-      AIO_E2E_ARTIFACT_DIR: ${{ github.workspace }}/.e2e-artifacts/dsh-native
-      AIO_E2E_WEBDRIVER_PORT: "4459"
-      AIO_E2E_DSH_PLUGIN_ZIP: ${{ github.workspace }}/.e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip
-      AIO_E2E_OFFLINE_RUNTIME: "1"
-      AIO_E2E_EDGE_DRIVER_DIR: ${{ github.workspace }}/.e2e-driver
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.11
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            ./src-tauri -> target
-
-      - name: Install dependencies
-        run: bun install
+      - name: Verify release ZIP checksum
+        shell: pwsh
+        run: |
+          $zip = $env:AIO_E2E_DSH_PLUGIN_ZIP
+          $checksum = Get-Content "$zip.sha256"
+          $expected = ($checksum -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "release ZIP checksum mismatch: $actual != $expected" }
+          New-Item -ItemType Directory -Force $env:AIO_E2E_ARTIFACT_DIR | Out-Null
+          "$actual  dsh-coding-workspace-0.1.0-win32-x64.zip" |
+            Set-Content (Join-Path $env:AIO_E2E_ARTIFACT_DIR "release-checksums.sha256")
 
       - name: Build frontend
         run: bun run build:vite
 
       - name: Build debug application binary
         run: cargo build --manifest-path src-tauri/Cargo.toml
-
-      - name: Download release ZIP
-        uses: actions/download-artifact@v4
-        with:
-          name: dsh-coding-workspace-win32-x64
-          path: .e2e-runtime
-
-      - name: Verify release ZIP checksum
-        shell: pwsh
-        run: |
-          $checksum = Get-Content ".e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip.sha256"
-          $expected = ($checksum -split "\s+")[0].ToLowerInvariant()
-          $actual = (Get-FileHash ".e2e-runtime/dsh-coding-workspace-0.1.0-win32-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) { throw "release ZIP checksum mismatch: $actual != $expected" }
 
       - name: Pre-download matching Edge WebDriver
         shell: pwsh
@@ -159,11 +150,22 @@ jobs:
           Remove-Item "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip"
           if (-not (Test-Path "$env:AIO_E2E_EDGE_DRIVER_DIR/msedgedriver.exe")) { throw "Edge WebDriver download failed for $edge" }
 
-      - name: Deny outbound traffic for the test stage
+      - name: Generate one-run crash injection token
         shell: pwsh
         run: |
-          netsh advfirewall firewall add rule name="AIO-DSH-E2E-OFFLINE" dir=out action=block remoteip=any
-          if ($LASTEXITCODE -ne 0) { throw "failed to install the offline firewall rule" }
+          $token = [guid]::NewGuid().ToString("N")
+          "AIO_DSH_E2E_CRASH_TOKEN=$token" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Deny outbound traffic for the runtime test stage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue |
+            Remove-NetFirewallRule
+          New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -RemoteAddress Internet | Out-Null
+          $reachable = Test-NetConnection 1.1.1.1 -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue
+          if ($reachable) { throw "outbound network remains reachable after applying the offline rule" }
 
       - name: Run offline native E2E
         shell: pwsh
@@ -173,15 +175,16 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          netsh advfirewall firewall delete rule name="AIO-DSH-E2E-OFFLINE"
+          Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue |
+            Remove-NetFirewallRule
 
-      - name: Upload redacted test reports
+      - name: Upload redacted checksums and test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-native-e2e-reports
+          name: dsh-native-e2e-results
           path: |
-            .e2e-artifacts/dsh-native/**/*.log
-            .e2e-artifacts/dsh-native/**/*.json
+            .e2e-artifacts/dsh-native/release-checksums.sha256
+            .e2e-artifacts/dsh-native/dsh-native-e2e-result.json
           if-no-files-found: warn
           retention-days: 7

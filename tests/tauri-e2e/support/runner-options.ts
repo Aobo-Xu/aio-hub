@@ -8,6 +8,14 @@ import {
 export type RecallCorpusMode =
   "smoke" | "curated" | "external-sample" | "external-full";
 
+export type FrontendServerMode = "development" | "preview";
+
+export function resolveFrontendServerMode(
+  presetId: E2ePresetId | undefined
+): FrontendServerMode {
+  return presetId === "dsh-runtime-native" ? "preview" : "development";
+}
+
 export function isExternalCorpusMode(mode: RecallCorpusMode): boolean {
   return mode === "external-sample" || mode === "external-full";
 }

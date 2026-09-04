@@ -323,6 +323,8 @@ pub fn register_commands(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<
         uninstall_skill,
         install_plugin_from_zip,
         preflight_plugin_zip,
+        stage_plugin_upgrade_from_zip,
+        finalize_plugin_upgrade,
         // Sidecar 插件命令
         execute_sidecar,
         // 常驻 Sidecar 进程命令

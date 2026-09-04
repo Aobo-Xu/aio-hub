@@ -31,6 +31,7 @@ import {
   formatPresetList,
   isExternalCorpusMode,
   parseE2eRunnerOptions,
+  resolveFrontendServerMode,
 } from "./support/runner-options";
 
 let vite: ReturnType<typeof Bun.spawn> | undefined;
@@ -365,25 +366,24 @@ if (!(await waitForUrl(frontendUrl.href, 1_000))) {
     "bin",
     "vite.js"
   );
-  vite = Bun.spawn(
-    [
-      "node",
-      viteEntry,
-      "--host",
-      "127.0.0.1",
-      "--port",
-      String(frontendPort),
-      "--strictPort",
-    ],
-    {
-      cwd: projectRoot,
-      env: process.env,
-      stdin: "ignore",
-      stdout: "inherit",
-      stderr: "inherit",
-      windowsHide: true,
-    }
+  const frontendServerMode = resolveFrontendServerMode(runnerOptions.presetId);
+  const viteArgs = ["node", viteEntry];
+  if (frontendServerMode === "preview") viteArgs.push("preview");
+  viteArgs.push(
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(frontendPort),
+    "--strictPort"
   );
+  vite = Bun.spawn(viteArgs, {
+    cwd: projectRoot,
+    env: process.env,
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+    windowsHide: true,
+  });
   if (!(await waitForUrl(frontendUrl.href, 30_000))) {
     vite.kill();
     throw new Error(`Vite did not become ready at ${frontendUrl.href}`);

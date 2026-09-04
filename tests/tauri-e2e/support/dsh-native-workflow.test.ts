@@ -26,6 +26,7 @@ type WorkflowStep = {
 type WorkflowJob = {
   "runs-on"?: string;
   needs?: string | string[];
+  env?: Record<string, string>;
   steps?: WorkflowStep[];
 };
 
@@ -42,9 +43,7 @@ function loadWorkflow(): Workflow {
 }
 
 function allRunSteps(job: WorkflowJob | undefined): string {
-  return (job?.steps ?? [])
-    .map((step) => step.run ?? "")
-    .join("\n");
+  return (job?.steps ?? []).map((step) => step.run ?? "").join("\n");
 }
 
 describe("dsh-runtime-native required workflow", () => {
@@ -53,36 +52,60 @@ describe("dsh-runtime-native required workflow", () => {
     expect(workflow.on).toBeDefined();
     expect(workflow.on).toHaveProperty("pull_request");
     expect(workflow.on).toHaveProperty("push");
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
   });
 
-  it("splits online packaging from the offline native E2E lane", () => {
+  it("keeps online preparation and offline execution in one required Windows job", () => {
     const workflow = loadWorkflow();
     const jobs = workflow.jobs ?? {};
-    const packageJob = jobs["package"];
     const e2eJob = jobs["native-e2e"];
 
-    expect(packageJob, "package job must exist").toBeDefined();
     expect(e2eJob, "native-e2e job must exist").toBeDefined();
     expect(e2eJob?.["runs-on"]).toBe("windows-latest");
+    expect(
+      jobs["package"],
+      "release ZIP must stay on the required runner"
+    ).toBeUndefined();
 
-    const needs = Array.isArray(e2eJob?.needs)
-      ? e2eJob?.needs
-      : [e2eJob?.needs];
-    expect(needs).toContain("package");
+    const steps = e2eJob?.steps ?? [];
+    const packageIndex = steps.findIndex((step) =>
+      step.run?.includes("package:platform")
+    );
+    const verifyIndex = steps.findIndex((step) =>
+      step.run?.includes("verify-release")
+    );
+    const smokeIndex = steps.findIndex((step) =>
+      step.name?.includes("ZIP contract and executable smoke")
+    );
+    const denyIndex = steps.findIndex((step) =>
+      step.run?.includes("New-NetFirewallRule")
+    );
+    const testIndex = steps.findIndex((step) =>
+      step.run?.includes("--preset dsh-runtime-native")
+    );
 
-    const packageRuns = allRunSteps(packageJob);
-    expect(packageRuns).toContain("package:platform");
-    expect(packageRuns).toContain("verify-release");
+    expect(packageIndex).toBeGreaterThanOrEqual(0);
+    expect(verifyIndex).toBeGreaterThan(packageIndex);
+    expect(smokeIndex).toBeGreaterThan(verifyIndex);
+    expect(smokeIndex).toBeLessThan(denyIndex);
+    expect(denyIndex).toBeGreaterThan(verifyIndex);
+    expect(testIndex).toBeGreaterThan(denyIndex);
   });
 
   it("pins the plugin checkout to a fixed ref", () => {
     const workflow = loadWorkflow();
-    const packageJob = workflow.jobs?.["package"];
-    const checkout = (packageJob?.steps ?? []).find((step) =>
-      step.uses?.startsWith("actions/checkout@")
+    const e2eJob = workflow.jobs?.["native-e2e"];
+    const checkout = (e2eJob?.steps ?? []).find(
+      (step) =>
+        step.uses?.startsWith("actions/checkout@") &&
+        step.with?.repository === "Aobo-Xu/aiohub-plugin-dsh-workspace"
     );
-    expect(checkout?.with?.repository).toBeDefined();
-    expect(String(checkout?.with?.ref)).toMatch(/^[0-9a-f]{40}$/);
+    expect(checkout?.with?.repository).toBe(
+      "Aobo-Xu/aiohub-plugin-dsh-workspace"
+    );
+    expect(String(checkout?.with?.ref)).toBe(
+      "12612fc8954555cbb91d2f8401d43e3ab59fb477"
+    );
   });
 
   it("runs the production E2E with isolated AIO_E2E_* wiring", () => {
@@ -111,14 +134,16 @@ describe("dsh-runtime-native required workflow", () => {
     const steps = e2eJob?.steps ?? [];
     const runs = allRunSteps(e2eJob);
 
-    expect(runs).toContain("netsh");
+    expect(runs).toContain("New-NetFirewallRule");
     const denyIndex = steps.findIndex(
-      (step) => step.run?.includes("netsh") && step.run.includes("block")
+      (step) =>
+        step.run?.includes("New-NetFirewallRule") &&
+        step.run.includes("-Action Block") &&
+        step.run.includes("-RemoteAddress Internet")
     );
     const restoreIndex = steps.findIndex(
       (step) =>
-        step.run?.includes("netsh") &&
-        step.run.includes("delete") &&
+        step.run?.includes("Remove-NetFirewallRule") &&
         step.if?.includes("always()")
     );
     expect(denyIndex, "a deny rule step must exist").toBeGreaterThanOrEqual(0);
@@ -134,19 +159,53 @@ describe("dsh-runtime-native required workflow", () => {
     expect(restoreIndex).toBeGreaterThan(testIndex);
   });
 
-  it("uploads only redacted artifacts", () => {
+  it("generates a fresh crash-injection token before the offline test", () => {
     const workflow = loadWorkflow();
     const e2eJob = workflow.jobs?.["native-e2e"];
-    const uploads = (e2eJob?.steps ?? []).filter((step) =>
-      step.uses?.startsWith("actions/upload-artifact@")
+    const steps = e2eJob?.steps ?? [];
+    const tokenIndex = steps.findIndex(
+      (step) =>
+        step.run?.includes("[guid]::NewGuid()") &&
+        step.run.includes("AIO_DSH_E2E_CRASH_TOKEN") &&
+        step.run.includes("GITHUB_ENV")
+    );
+    const denyIndex = steps.findIndex((step) =>
+      step.run?.includes("New-NetFirewallRule")
+    );
+    const testIndex = steps.findIndex((step) =>
+      step.run?.includes("--preset dsh-runtime-native")
+    );
+
+    expect(e2eJob?.env?.AIO_DSH_E2E_CRASH_TOKEN).toBeUndefined();
+    expect(tokenIndex).toBeGreaterThanOrEqual(0);
+    expect(tokenIndex).toBeLessThan(denyIndex);
+    expect(tokenIndex).toBeLessThan(testIndex);
+  });
+
+  it("uploads only redacted artifacts", () => {
+    const workflow = loadWorkflow();
+    const uploads = Object.values(workflow.jobs ?? {}).flatMap((job) =>
+      (job.steps ?? []).filter((step) =>
+        step.uses?.startsWith("actions/upload-artifact@")
+      )
     );
     expect(uploads.length).toBeGreaterThan(0);
+    expect(uploads).toHaveLength(1);
     for (const upload of uploads) {
       const artifactPath = String(upload.with?.path ?? "");
       expect(artifactPath).not.toContain("AIO_E2E_DATA_DIR");
       expect(artifactPath).not.toContain("plugins-data");
       expect(artifactPath).not.toContain(".zip");
       expect(artifactPath).not.toContain("aiohub.exe");
+      expect(
+        artifactPath
+          .trim()
+          .split(/\r?\n/)
+          .map((entry) => entry.trim())
+      ).toEqual([
+        ".e2e-artifacts/dsh-native/release-checksums.sha256",
+        ".e2e-artifacts/dsh-native/dsh-native-e2e-result.json",
+      ]);
     }
   });
 });
