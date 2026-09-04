@@ -158,7 +158,8 @@ describe("dsh-runtime-native required workflow", () => {
         step.run?.includes("New-NetFirewallRule") &&
         step.run.includes("-Action Block") &&
         step.run.includes("-RemoteAddress Internet") &&
-        step.run.includes("-InterfaceAlias $externalInterfaces")
+        step.run.includes("-InterfaceAlias $externalInterfaces") &&
+        step.run.includes("-LocalAddress $externalLocalAddresses")
     );
     const restoreIndex = steps.findIndex(
       (step) =>

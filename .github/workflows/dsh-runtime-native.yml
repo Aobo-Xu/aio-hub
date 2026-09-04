@@ -164,21 +164,33 @@ jobs:
           $ErrorActionPreference = "Stop"
           Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue |
             Remove-NetFirewallRule
-          $externalInterfaces = @(
+          $externalConfigs = @(
             Get-NetIPConfiguration |
-              Where-Object { $_.IPv4DefaultGateway -or $_.IPv6DefaultGateway } |
-              Select-Object -ExpandProperty InterfaceAlias -Unique
+              Where-Object { $_.IPv4DefaultGateway -or $_.IPv6DefaultGateway }
           )
-          if ($externalInterfaces.Count -eq 0) {
+          $externalInterfaces = @(
+            $externalConfigs | Select-Object -ExpandProperty InterfaceAlias -Unique
+          )
+          $externalLocalAddresses = @(
+            $externalConfigs |
+              ForEach-Object {
+                $_.IPv4Address | Select-Object -ExpandProperty IPAddress
+                $_.IPv6Address | Select-Object -ExpandProperty IPAddress
+              } |
+              Where-Object { $_ } |
+              Select-Object -Unique
+          )
+          if ($externalInterfaces.Count -eq 0 -or $externalLocalAddresses.Count -eq 0) {
             throw "no external network interface with a default gateway was found"
           }
-          New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -InterfaceAlias $externalInterfaces -RemoteAddress Internet | Out-Null
+          New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -InterfaceAlias $externalInterfaces -LocalAddress $externalLocalAddresses -RemoteAddress Internet | Out-Null
           $reachable = Test-NetConnection 1.1.1.1 -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue
           if ($reachable) { throw "outbound network remains reachable after applying the offline rule" }
           $rule = Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE
           $addressFilter = $rule | Get-NetFirewallAddressFilter
           $interfaceFilter = $rule | Get-NetFirewallInterfaceFilter
           Write-Output ("offline rule interfaces: " + ($interfaceFilter.InterfaceAlias -join ","))
+          Write-Output ("offline rule local addresses: " + ($addressFilter.LocalAddress -join ","))
           Write-Output ("offline rule remote addresses: " + ($addressFilter.RemoteAddress -join ","))
 
       - name: Run offline native E2E
