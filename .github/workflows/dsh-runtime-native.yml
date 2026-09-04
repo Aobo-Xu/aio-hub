@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Aobo-Xu/aiohub-plugin-dsh-workspace
-          ref: 12612fc8954555cbb91d2f8401d43e3ab59fb477
+          ref: 71e1cdc4a039fbbd78bfc23a513794f1743eab42
           path: plugin
 
       - name: Check out pinned DSH source

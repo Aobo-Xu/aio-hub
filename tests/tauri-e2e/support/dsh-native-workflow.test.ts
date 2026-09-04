@@ -104,7 +104,7 @@ describe("dsh-runtime-native required workflow", () => {
       "Aobo-Xu/aiohub-plugin-dsh-workspace"
     );
     expect(String(checkout?.with?.ref)).toBe(
-      "12612fc8954555cbb91d2f8401d43e3ab59fb477"
+      "71e1cdc4a039fbbd78bfc23a513794f1743eab42"
     );
   });
 
