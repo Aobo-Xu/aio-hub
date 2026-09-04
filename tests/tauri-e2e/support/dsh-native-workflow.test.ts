@@ -107,11 +107,11 @@ describe("dsh-runtime-native required workflow", () => {
       "Aobo-Xu/aiohub-plugin-dsh-workspace"
     );
     expect(String(checkout?.with?.ref)).toBe(
-      "8751ae4b3e8915bbb6cd025e4e924cfd35b36b2c"
+      "e8575534ccf7dfacfa86cda8bd3c0d4c40f70205"
     );
   });
 
-  it("fetches DSH tag metadata while checking out the pinned source commit", () => {
+  it("acquires the lock-pinned official wheel without checking out DSH source", () => {
     const workflow = loadWorkflow();
     const e2eJob = workflow.jobs?.["native-e2e"];
     const checkout = (e2eJob?.steps ?? []).find(
@@ -120,10 +120,25 @@ describe("dsh-runtime-native required workflow", () => {
         step.with?.repository === "deepseek-ai/deepseek-harness"
     );
 
-    expect(String(checkout?.with?.ref)).toBe(
-      "db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5"
+    expect(checkout).toBeUndefined();
+    expect(allRunSteps(e2eJob)).toContain("runtime:acquire-wheel");
+    expect(allRunSteps(e2eJob)).not.toContain("build:dsh-source");
+  });
+
+  it("only waives a classified pre-test infrastructure failure", () => {
+    const workflow = loadWorkflow();
+    const e2eJob = workflow.jobs?.["native-e2e"];
+    const steps = e2eJob?.steps ?? [];
+    const runStep = steps.find((step) =>
+      step.run?.includes("--preset dsh-runtime-native")
     );
-    expect(checkout?.with?.["fetch-depth"]).toBe(0);
+    const classifyStep = steps.find((step) =>
+      step.run?.includes("dsh-native-gate")
+    );
+
+    expect(runStep?.run).toContain("AIO_DSH_E2E_EXIT_CODE");
+    expect(classifyStep?.if).toContain("always()");
+    expect(classifyStep?.run).toContain("dsh-native-e2e-result.json");
   });
 
   it("runs the production E2E with isolated AIO_E2E_* wiring", () => {

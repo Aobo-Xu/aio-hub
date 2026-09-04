@@ -16,7 +16,7 @@ canonical_spec: openspec
 
 方案可行，推荐形态是：AIO 通过第一方 Resident Sidecar 插件托管 DSH，DSH 作为独立、可销毁、可重建、受策略约束的完整 Coding 执行域。AIO 不是 DSH 内部 Agent Loop 的根调度器，也不接管 DSH 会话语义；AIO 是产品入口和外层资源所有者。
 
-首版可以在 Windows x64、Linux x64 和 macOS arm64 同步交付，前提是采用每平台原生构建、独立 ZIP 和真实主机门禁。Linux arm64 可同步产出预览包，但在 AIO 普通 ARM64 桌面发行与完整集成测试建立前不能宣称正式支持。Flatpak 不能因为 AIO 能打包就自动视为 DSH supported，必须单独验证嵌套执行与沙箱。
+经范围决策，本 change 的首发只交付 Windows x64。Linux x64、macOS arm64、Linux arm64 预览和 Flatpak 兼容性将由后续独立 change 在每平台原生构建、独立 ZIP 与真实宿主门禁具备后交付；当前实现的跨平台抽象不得被表述为这些平台已支持。
 
 可达到的程度：
 
@@ -26,12 +26,12 @@ canonical_spec: openspec
 - 让没有独立 Python、Node.js、WSL2 或 DSH 安装的用户离线启动固定 runtime。
 - 通过 Facade 和协议稳定层，为未来 AIO 全局 Capability Runtime、模型 broker 或 secret vault 保留替换位置。
 
-不能在 Phase 1 保证的事项：
+不能在本 change 首发保证的事项：
 
 - DSH 上游明确仍是 alpha，sandbox/approval 尚不能被描述为经过安全审计或绝对隔离。
 - 不保证 AIO 的每一种 Provider 都能无损映射；VCP/OpenAI-compatible Chat Completions 是必需基线，其他逐个准入。
 - 不把 AIO 对话树与 DSH session 合并为一个数据库，也不承诺恢复进程内 shell 状态。
-- 不在 Flatpak 真实门禁通过前承诺正式支持，不以放宽 sandbox 换取支持标签。
+- Linux x64、macOS arm64、Linux arm64 或 Flatpak 支持；后续 change 必须分别完成真实门禁，且不得以放宽 sandbox 换取支持标签。
 
 ## 3. 设计依据
 
@@ -46,7 +46,7 @@ AIO 的插件目录规范要求插件独立仓库管理，开发时可挂载到 
 - [`docs/design/agent-harness-capability-runtime-proposal.md`](../../design/agent-harness-capability-runtime-proposal.md)
 - AIO raw plugin index: <https://raw.githubusercontent.com/miaotouy/aio-hub/dev/docs/guide/plugins/index.md>
 - AIO raw plugin directory guide: <https://raw.githubusercontent.com/miaotouy/aio-hub/dev/plugins/README.md>
-- DSH fixed release: <https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-alpha.1>
+- DSH fixed release: <https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.1.2-rc.1>
 
 Codex 的 app-server/rollout 设计用于参考初始化协商、生成契约、Turn/item correlation、interaction resolution、bounded queue 与 durable fact/projection 分层。pi 用于参考小核心、可组合 provider、显式资源所有权和适配器边界。两者都不是依赖，不引入第三个 Agent 域，也不改变 AIO + DSH 主体。
 
@@ -218,16 +218,15 @@ AIO 不把普通 LLM Chat 的 worldbook、Recall、regex、context compressor �
 
 ## 12. 运行时供应链
 
-首个固定基线是 `dsh-v0.1.2-alpha.1` / `cd5ef8148158c3a752a658978873241fdf8e2bbc`。虽然源码和 CI 声明 Windows x64、Linux x64/arm64、macOS arm64 runtime，但当前 `0.1.2a1` PyPI SDK/runtime artifact 不存在，GitHub Release 也无可固定的二进制附件。
+唯一首发基线是 `dsh-v0.1.2-rc.1` / `a66e4702047846cdaa10c66c9d3df3951f5ea70d` 及其官方 Windows x64 `deepseek-harness-runtime-bin` wheel。版本、来源和派生文件事实只保存在稳定路径 `runtime-lock/dsh-runtime.json`；解析器、打包器、release verifier、Supervisor 与复用测试不得硬编码 DSH 版本，从而使后续版本更新只需替换 lock 与派生产物。
 
-因此构建逻辑按以下优先级：
+因此供应链逻辑为：
 
-1. 查找精确版本、精确平台、持久可下载的官方 wheel。
-2. 验证来源、hash、license、runtime closure、contract/profile 和黑盒行为。
-3. 若不存在，从固定官方 tag/commit 在对应原生 runner 使用锁定工具链构建。
-4. 标记 `source=official-wheel` 或 `source=project-built-from-official-source`。
-5. 生成 SBOM、license bundle、runtime lock 与签名/校验和。
-6. 只把通过 release-shaped 测试的 artifact 放入平台 ZIP。
+1. 从稳定 lock 读取精确版本、平台、持久 wheel URL 与 SHA-256。
+2. 先验证完整 wheel，再动态发现版本化 `.dist-info`，提取主程序、`-rg.exe`、LICENSE 与第三方声明。
+3. 验证文件 hash、runtime closure、contract/profile 和黑盒行为，不提供源码构建回退。
+4. 生成 SBOM、license bundle、平台 scoped lock 与 ZIP 校验和。
+5. 只把通过 release-shaped 测试的 artifact 放入平台 ZIP。
 
 不使用临时 Actions artifact、源码 archive 或移动 ref 充当 runtime。未来官方精确 wheel 出现后，仍必须通过同一门禁，不能因为“官方”而跳过兼容验证。
 
@@ -238,11 +237,11 @@ AIO 不把普通 LLM Chat 的 worldbook、Recall、regex、context compressor �
 | 包 | 级别 | 关键测试 |
 |---|---|---|
 | `win32-x64` | Supported | Job Object、DACL、descendants、长/非 ASCII 路径、无控制台泄漏 |
-| `linux-x64` | Supported | glibc 2.28+、`.deb`、`.AppImage`、mode、process group、bwrap/Landlock |
-| `darwin-arm64` | Supported | macOS 14+、mode、process group、Seatbelt、app data/workspace |
-| `linux-arm64` | Preview | native artifact smoke；等待 AIO ARM64 desktop E2E |
+| `linux-x64` | Deferred | 后续 change：glibc 2.28+、`.deb`、`.AppImage`、mode、process group、bwrap/Landlock |
+| `darwin-arm64` | Deferred | 后续 change：macOS 14+、mode、process group、Seatbelt、app data/workspace |
+| `linux-arm64` | Deferred | 后续 change：preview artifact smoke；等待 AIO ARM64 desktop E2E |
 
-Flatpak 独立验证 executable、nested filesystem、shell、document portal、workspace access 和 bwrap/Landlock。如果失败，提供准确的 unsupported/preview 诊断，不追加宽泛 filesystem 权限来掩盖问题。
+Flatpak 由后续 change 独立验证 executable、nested filesystem、shell、document portal、workspace access 和 bwrap/Landlock。完成前，本 change 必须返回明确的不支持诊断，不追加宽泛 filesystem 权限来掩盖问题。
 
 ## 14. 必要的 AIO 兼容修复
 
@@ -283,13 +282,15 @@ AIO 当前 ZIP installer 重新创建文件但不恢复 Unix executable bits。P
 
 ### 原生端到端测试
 
-Windows x64、Linux x64、macOS arm64 都从最终 ZIP 开始：全新安装、离线冷启动、mock-provider Turn、工具子进程、取消、flush、退出、崩溃、interrupted recovery、升级、回退、卸载与数据保留。验证无孤儿进程、无秘密输出、长路径/非 ASCII workspace 和 helper executable mode。
+Windows x64 从最终 ZIP 开始，并使用既有 Tauri WebDriver 经生产 `install_plugin_from_zip` 和 resident Sidecar IPC 验证：全新安装、离线冷启动、真实 JSONL handshake、mock-provider Turn、工具子进程、取消、flush、退出、崩溃、interrupted recovery、绝不重放副作用、冷恢复、升级、回退、卸载与数据保留。测试不新增 Coding工作站 UI，不使用原生文件选择器、不直接解压 ZIP，也不以 layout fixture 代替安装。验证无孤儿进程、无秘密输出、长路径/非 ASCII workspace 和 helper executable mode。
 
-Linux 同时覆盖 `.deb` 与 `.AppImage`。Flatpak 使用独立兼容矩阵。Linux ARM64 只执行 preview artifact smoke 和可用的 native tests，不提升正式支持级别。
+升级与回退使用宿主两阶段事务：候选 ZIP 先完成生产平台预检并进入隔离 staging，以独立 probe plugin id 经 resident IPC 完成 initialize、lease 和真实 loopback coding Turn；验证成功后复制到 `plugins` 同卷的未执行准备目录，再以同级 rename 切换 payload，失败则恢复上一版本。持久 `plugins-data/<pluginId>` 不参与交换，失败候选和 probe data 均清理。该布局避免 Windows 在候选退出后仍短暂持有其工作目录句柄时，把上一版本移动进被锁住的候选事务树。
+
+Linux `.deb`/`.AppImage`、macOS、Flatpak 与 Linux ARM64 preview 的原生门禁均由后续独立 change 定义并执行；首发不把模拟布局测试或 Windows 结果作为这些平台的替代证据。
 
 ### 验收门禁
 
-任何平台只有同时通过 artifact provenance、clean install、real runtime handshake、mock-provider coding Turn、process cleanup、credential redaction、persistence flush、crash fencing 和 cold resume 才能标记 supported。
+GitHub Actions 先在受控获取阶段下载 `runtime-lock/dsh-runtime.json` 固定的官方 wheel，验证 wheel、提取文件、SBOM、license/notices 与版本身份；Windows 闭包只允许主程序与 `-rg.exe` sidecar。随后在启用防火墙前运行 `bun run build:vite` 和 `cargo build --manifest-path src-tauri/Cargo.toml`，分别提供预构建前端与 debug binary；断网运行阶段由 runner 通过 `vite preview` 在显式 frontend origin 服务该 `dist`，并显式设置 binary、隔离 app-data、artifact root 与 WebDriver port。测试期间以唯一 Windows Firewall outbound deny 规则阻断 Internet、保留 `127.0.0.1` 给 preview/WebDriver/mock provider，结束后在上传前清理规则。PR 快速层验证 ZIP 合同和 executable smoke；Windows native E2E 是发布前门禁。若 WebDriver/端口/runner 在用例开始前发生受控基础设施故障，且前述硬门禁全部通过，可生成 `gatePassed=false`、`formalReleaseBlocked=true` 的 `infrastructure-blocked` 报告并临时继续 change；这不是产品通过，产品/未知失败不得豁免，正式发布前必须补跑成功。CI 只上传脱敏报告、校验和和测试结果。任何平台只有同时通过 artifact provenance、clean install、real runtime handshake、mock-provider coding Turn、process cleanup、credential redaction、persistence flush、crash fencing 和 cold resume 才能标记 supported。
 
 ## 17. 1+1 大于 2 的协同价值
 
@@ -304,7 +305,7 @@ AIO 提供 DSH 缺少的产品化统一入口、成熟 Profile/设置、工作�
 
 ## 18. 发布与演进顺序
 
-1. Runtime core：独立仓库、协议、Supervisor、runtime supply chain、bridge、Profile/Prompt/credential、三平台门禁。
+1. Runtime core：独立仓库、协议、Supervisor、runtime supply chain、bridge、Profile/Prompt/credential、Windows x64 门禁。
 2. `Coding工作站` UI：同级工具、工作区/Profile 选择、会话投影、审批、diff/terminal/test/sub-agent 呈现、lifecycle controls。
 3. DSH 生态管理：参考 `dsh-plugin-hub` 的索引、保护清单、任务进度、版本检测、备份回退，但不嵌入其 Web UI，也不绕过 AIO 管理边界。
 4. 可选融合：AIO global Capability Runtime adapter、model broker/vault、显式 Chat-to-Coding context snapshot、AIO tool MCP projection。
@@ -314,4 +315,4 @@ AIO 提供 DSH 缺少的产品化统一入口、成熟 Profile/设置、工作�
 
 采用方案 1，并把方案 3 保持为替换接口。先把 DSH 的完整能力可靠地带进 AIO，而不是在首版重构双方内部。实现优先级依次是供应链可复现、协议与进程所有权、会话/interaction 恢复、模型与 Prompt 保真、安全门禁，最后才是丰富 UI 和生态扩展。
 
-三平台同步首发是可行的，但“同日发布”不能替代“同等门禁”。Windows x64、Linux x64、macOS arm64 分别通过真实宿主测试后独立标记 supported；Linux ARM64 与 Flatpak 保持诚实的 preview/compatibility 状态。这样既能扩大首版覆盖，又不会以模糊兼容性牺牲 DSH 执行域的可靠性和安全边界。
+Windows x64 首发先通过完整真实宿主测试后再标记 supported。Linux x64、macOS arm64、Linux ARM64 与 Flatpak 仅在后续 change 分别通过对应原生门禁后才可独立定级；这样不会以模糊兼容性牺牲 DSH 执行域的可靠性和安全边界。

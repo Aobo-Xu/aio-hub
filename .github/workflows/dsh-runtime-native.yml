@@ -33,31 +33,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Aobo-Xu/aiohub-plugin-dsh-workspace
-          ref: 8751ae4b3e8915bbb6cd025e4e924cfd35b36b2c
+          ref: e8575534ccf7dfacfa86cda8bd3c0d4c40f70205
           path: plugin
-
-      - name: Check out pinned DSH source
-        uses: actions/checkout@v4
-        with:
-          repository: deepseek-ai/deepseek-harness
-          ref: db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5
-          fetch-depth: 0
-          path: dsh-source
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.11
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.7.0
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -98,13 +80,9 @@ jobs:
           bun run build:protocol &&
           cargo build -p aio-dsh-supervisor --release
 
-      - name: Build pinned DSH runtime from official source
+      - name: Acquire pinned official DSH runtime wheel
         working-directory: plugin
-        run: >-
-          bun run build:dsh-source
-          --source-root ../dsh-source
-          --platform win32-x64
-          --out .artifacts/runtime
+        run: bun run runtime:acquire-wheel
 
       - name: Package offline win32-x64 ZIP
         working-directory: plugin
@@ -194,8 +172,18 @@ jobs:
           Write-Output ("offline rule remote addresses: " + ($addressFilter.RemoteAddress -join ","))
 
       - name: Run offline native E2E
+        id: offline-native-e2e
         shell: pwsh
-        run: bun run test:tauri:e2e -- --preset dsh-runtime-native
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "dsh-native-e2e.log"
+          bun run test:tauri:e2e -- --preset dsh-runtime-native 2>&1 |
+            Tee-Object -FilePath $log
+          $exitCode = $LASTEXITCODE
+          "AIO_DSH_E2E_EXIT_CODE=$exitCode" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "AIO_DSH_E2E_LOG=$log" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          exit 0
 
       - name: Capture native E2E diagnostics
         if: always()
@@ -214,6 +202,15 @@ jobs:
             $rule | Get-NetFirewallAddressFilter | Format-List
             $rule | Get-NetFirewallInterfaceFilter | Format-List
           }
+
+      - name: Classify native E2E result
+        if: always()
+        shell: pwsh
+        run: >-
+          bun tests/tauri-e2e/support/dsh-native-gate.ts
+          --exit-code $env:AIO_DSH_E2E_EXIT_CODE
+          --log $env:AIO_DSH_E2E_LOG
+          --out "$env:AIO_E2E_ARTIFACT_DIR/dsh-native-e2e-result.json"
 
       - name: Restore outbound traffic
         if: always()

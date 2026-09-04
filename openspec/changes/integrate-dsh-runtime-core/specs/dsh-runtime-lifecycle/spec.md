@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: 可复现且离线的多平台运行时
-系统 SHALL 为每个目标平台发布独立 ZIP，并携带固定 DSH 版本、commit、runtime 闭包、来源类型、构建工具链、SHA-256、许可证与 SBOM。构建流水线 SHALL 优先采用精确兼容且通过门禁的官方平台 wheel；不存在时 MAY 从固定官方 tag/commit 原生构建，并 MUST 将产物标记为项目构建而非上游发布。用户首次启动 MUST NOT 下载 runtime，也不得要求系统已安装 Node.js、Python、WSL2 或 DSH。
+### Requirement: 可复现且离线的 Windows x64 运行时
+系统 SHALL 为 `win32-x64` 发布独立 ZIP，并携带固定 DSH 版本、commit、manifest-selected Supervisor、完整 runtime 闭包、来源类型、构建工具链、持久化 SHA-256、许可证与 SBOM。构建流水线 SHALL 优先采用精确兼容且通过门禁的官方平台 wheel；不存在时 MAY 从固定官方 tag/commit 原生构建，并 MUST 将产物标记为项目构建而非上游发布。用户首次启动 MUST NOT 下载 runtime，也不得要求系统已安装 Node.js、Python、WSL2 或 DSH。
 
 #### Scenario: 官方 wheel 可用
 - **WHEN** 精确版本和平台的官方 wheel 可下载且通过来源、完整性、许可证与黑盒测试
@@ -15,20 +15,12 @@
 - **WHEN** runtime 实际校验和、契约哈希或平台描述与 lock 不一致
 - **THEN** Supervisor 拒绝执行，保持工作区和持久会话不变，并返回不含秘密的修复诊断
 
-### Requirement: 明确的平台支持矩阵
-Phase 1 SHALL 完整支持 `win32-x64`、glibc 2.28+ 的 `linux-x64` 和 macOS 14+ 的 `darwin-arm64`。`linux-arm64` MAY 发布预览 ZIP，但 MUST NOT 在普通 AIO Linux arm64 桌面宿主和全套集成测试存在前宣称正式支持。其他平台 SHALL 明确失败，不得选择名称相近的 runtime。
+### Requirement: 明确的 Windows x64 首发支持矩阵
+本 change SHALL 只完整支持 `win32-x64`。glibc 2.28+ 的 `linux-x64`、macOS 14+ 的 `darwin-arm64`、`linux-arm64` 预览和 AIO Flatpak 兼容性 MUST 由后续独立 change 实现与验证；本 change 不得将 Windows 证据或通用代码路径表述为这些平台的支持。其他平台 SHALL 明确失败，不得选择名称相近的 runtime。
 
-#### Scenario: AIO Linux 正式包启动
-- **WHEN** 用户从 AIO `.deb` 或 `.AppImage` 在满足 glibc 基线的 `linux-x64` 主机启动 Coding工作站
-- **THEN** 系统选择 `linux-x64` runtime 并通过与 Windows/macOS 相同的协议、生命周期和安全门禁
-
-#### Scenario: Flatpak 环境
-- **WHEN** Coding工作站运行于 AIO Flatpak
-- **THEN** 系统先验证 Sidecar 执行、嵌套文件系统、shell、document portal、workspace 权限及 DSH sandbox；任一必需项失败时显示 unsupported/preview 诊断，不为获得支持标签而放宽沙箱
-
-#### Scenario: Linux ARM64 预览包
-- **WHEN** 用户检查 `linux-arm64` 构建产物
-- **THEN** 产物标记为 preview，并说明尚无普通 AIO Linux ARM64 桌面发行与完整宿主集成保证
+#### Scenario: 延后平台启动
+- **WHEN** 用户在 `linux-x64`、`darwin-arm64`、`linux-arm64` 或 Flatpak 环境启动 Coding工作站
+- **THEN** 系统明确报告该平台尚未由此首发支持，不尝试跨架构或降级运行，也不放宽 sandbox
 
 #### Scenario: 未支持平台
 - **WHEN** 平台为 `darwin-x64`、`win32-arm64` 或其他未列入支持矩阵的组合
@@ -49,8 +41,8 @@ Phase 1 SHALL 完整支持 `win32-x64`、glibc 2.28+ 的 `linux-x64` 和 macOS 1
 - **WHEN** 最后一个控制租约已释放、没有 pending interaction/job，且 DSH 权威状态持续静止 10 分钟
 - **THEN** Supervisor 有界地刷新持久化、dispose Cordis 并回收完整进程树
 
-### Requirement: 受管生命周期、崩溃语义与平台进程后端
-Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed 和 unavailable 状态，并使用 `domainGenerationId` 隔离每次启动。Windows SHALL 使用 Job Object 与 DACL；Linux/macOS SHALL 使用进程组和有界 TERM/KILL。DSH 意外退出后 MAY 自动恢复 runtime readiness，但 MUST NOT 自动重放活动任务；受影响 Turn SHALL 标记为 interrupted，并由用户在新 Turn 中显式继续。
+### Requirement: 受管生命周期、崩溃语义与 Windows 进程后端
+Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed 和 unavailable 状态，并使用 `domainGenerationId` 隔离每次启动。首发 Windows SHALL 使用 Job Object 与 DACL。DSH 意外退出后 MAY 自动恢复 runtime readiness，但 MUST NOT 自动重放活动任务；受影响 Turn SHALL 标记为 interrupted，并由用户在新 Turn 中显式继续。
 
 #### Scenario: 正常停止
 - **WHEN** 用户停止执行域、禁用插件或退出 AIO
@@ -65,7 +57,7 @@ Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed �
 - **THEN** Supervisor 按 `domainGenerationId` 丢弃该输出，不改变新代际会话或作业状态
 
 ### Requirement: 权威沙箱与显式安全状态
-DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。Linux SHALL 优先使用 bwrap、再使用 Landlock；macOS SHALL 使用 Seatbelt；Windows SHALL 使用 ACL/受限 token 能力。必需沙箱不可用时执行 SHALL fail closed，UI SHALL 明确显示 `full` 或 `partial` 隔离状态，不得把 Sidecar 生命周期机制描述为安全沙箱。
+DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。首发 Windows SHALL 使用 ACL/受限 token 能力。必需沙箱不可用时执行 SHALL fail closed，UI SHALL 明确显示 `full` 或 `partial` 隔离状态，不得把 Sidecar 生命周期机制描述为安全沙箱。Linux 的 bwrap/Landlock 与 macOS Seatbelt 验证由后续平台扩展 change 承担。
 
 #### Scenario: 必需沙箱不可用
 - **WHEN** 当前平台无法建立所选权限模式要求的 DSH 沙箱
@@ -78,10 +70,25 @@ DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。Linux SHALL �
 ### Requirement: 隔离数据、可回退升级与 POSIX 安装兼容
 系统 SHALL 将 DSH Home、凭据镜像、桥接状态和临时文件放入插件拥有的隔离目录，并在升级失败时保留最后可用 runtime 与持久会话。POSIX 上 AIO ZIP 安装器 SHALL 安全保留普通文件的 Unix mode，或仅为 manifest 选中的当前平台 Native/Sidecar 二进制恢复可执行位；路径校验 MUST 保持不变并 MUST 拒绝 symlink 与特殊文件，Windows 行为不得改变。
 
-#### Scenario: POSIX 安装并启动 Sidecar
-- **WHEN** Linux 或 macOS 用户通过 AIO 安装当前平台插件 ZIP
-- **THEN** 经 manifest 验证的 Supervisor 和必要 helper 具备可执行权限，且未被选中的数据文件不会被任意提升权限
+#### Scenario: 未来 POSIX 安装并启动 Sidecar
+- **WHEN** 后续平台扩展 change 启用 Linux 或 macOS 插件 ZIP 安装
+- **THEN** 经 manifest 验证的 Supervisor 和必要 helper 必须具备可执行权限，且未被选中的数据文件不会被任意提升权限；此条件不构成当前 Windows 首发的支持声明
 
 #### Scenario: 升级握手失败
 - **WHEN** 新 runtime 或 bridge 无法通过校验、契约握手或冒烟测试
 - **THEN** 系统回退最后可用版本，不迁移或删除原会话，并显示失败原因
+
+### Requirement: Windows 原生 E2E 必过门禁与最小 Supervisor ABI
+GitHub Actions SHALL 在 Windows lane 中从稳定 runtime lock 获取固定 DSH 官方 Windows wheel并验证 runtime closure，再构建 AIO debug binary。受控获取阶段 SHALL 校验 tag、commit、wheel 与文件 hash、SBOM、license/notices，且是唯一允许联网获取 wheel、工具链或依赖的阶段；解析器、打包器、release verifier、Supervisor 与复用测试 MUST NOT 硬编码 DSH 版本。离线运行阶段 SHALL 仅使用已验证输入，并以唯一 Windows Firewall outbound deny 规则阻止 Internet、保留 `127.0.0.1`。运行测试时 SHALL 设置明确的 `AIO_E2E_BINARY`、`AIO_E2E_FRONTEND_URL`、`AIO_E2E_DATA_DIR`、`AIO_E2E_ID_SUFFIX`、`AIO_E2E_ARTIFACT_DIR` 和 `AIO_E2E_WEBDRIVER_PORT`，并 MUST 禁止网络 runtime/依赖/模型下载。测试 SHALL 使用既有 Tauri WebDriver 和生产 `install_plugin_from_zip`、resident Sidecar IPC；不得新增 Coding工作站 UI、使用原生文件选择器、直接解压 ZIP 或以 layout fixture 替代安装。
+
+若 WebDriver、端口或 runner 环境在测试用例执行前发生受控分类的基础设施故障，且同一 job 的构建、打包、产物校验及 executable smoke 已通过，CI MAY 生成脱敏的 `infrastructure-blocked` 结果并临时豁免该次 E2E，以便 change 继续后续流程。该结果 MUST 标记 `gatePassed=false` 与 `formalReleaseBlocked=true`，MUST NOT 表述为产品测试通过；测试断言、生产 IPC/Sidecar 失败或未知错误不得豁免，正式发布前 MUST 补跑并通过 Windows native E2E。
+
+Supervisor SHALL 在 JSONL 上至少支持 `initialize`、`ready`、`error`、`shutdown`、generation 与 lease 事件。每次启动 MUST 发布新 `domainGenerationId`；未知或过期 generation/lease 命令 MUST 结构化拒绝且不触达 DSH。`shutdown` MUST 先发 `stopped` 再以 0 退出。仅当 E2E 环境提供随机 crash token 时，crash injection MAY 可用；它 MUST 将活动 Turn 记为 `interrupted`、不得重放副作用，并以非零退出。
+
+#### Scenario: Windows 离线 native lane
+- **WHEN** GitHub Actions 执行 Windows native E2E
+- **THEN** 测试通过生产 IPC 安装最终 ZIP、启动 resident Sidecar，并在断网状态验证真实 handshake、mock-provider Turn、取消/flush、进程树清理、crash interrupted、冷恢复、升级/回退、卸载与数据保留
+
+#### Scenario: PR 快速层与产物保密
+- **WHEN** pull request CI 运行快速层
+- **THEN** 它只验证 ZIP 合同和 manifest-selected executable smoke；Windows native E2E 仍为必过门禁，且 CI 只上传脱敏报告、校验和和测试结果

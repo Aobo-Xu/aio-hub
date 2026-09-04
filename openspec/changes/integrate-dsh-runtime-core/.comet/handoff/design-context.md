@@ -3,7 +3,7 @@
 - Change: integrate-dsh-runtime-core
 - Phase: design
 - Mode: compact
-- Context hash: 5cb5d7556e56955b3114c8ced5fa32fac3cfa73582c01dcfd8b086f5af14751b
+- Context hash: 24d6136a3909d389aaabd4754e3f499e7723bc0e9780a73d7471b6fd98a54d4c
 
 Generated-by: comet-handoff.sh
 
@@ -12,8 +12,8 @@ OpenSpec remains the canonical capability spec. This handoff is a deterministic,
 ## openspec/changes/integrate-dsh-runtime-core/proposal.md
 
 - Source: openspec/changes/integrate-dsh-runtime-core/proposal.md
-- Lines: 1-35
-- SHA256: fd19584e71354c662724109b72bfb942acef4cd0cc26b5fa40a3c7749c4db4a2
+- Lines: 1-36
+- SHA256: d573bbc71a024e83b249e951ccc2e6fb0de57f0c28789156d91ad4128d17378d
 
 ```md
 ## Why
@@ -27,7 +27,7 @@ AIO 缺少面向代码任务的完整本地执行域，而 DeepSeek Harness（DS
 - 使用版本化 JSONL 协议连接 Supervisor 与项目侧 TypeScript/ESM Cordis bridge，提供能力协商、单写控制租约、只读观察、代际隔离、权威快照、背压及崩溃恢复。
 - AIO LLM Profile 是唯一模型配置入口。首版强制支持经过验证的 VCP/OpenAI-compatible Chat Completions 映射；其他 Provider 仅在字段和行为可无损映射且通过黑盒测试后启用。
 - DSH 保持唯一 System Prompt 组装权；AIO 用户文本通过公开组装扩展点注入，`{{Nova}}` 等占位符保持字面值，并继续仅由现有 VCP 链解析。
-- 发布 `win32-x64`、`linux-x64` 和 `darwin-arm64` 的独立离线 ZIP；`linux-arm64` 只发布预览产物。优先使用精确匹配且通过门禁的官方 wheel，否则从固定 DSH tag/commit 原生可复现构建并记录完整来源。
+- 首发只发布 `win32-x64` 的独立离线 ZIP。优先使用精确匹配且通过门禁的官方 wheel，否则从固定 DSH tag/commit 原生可复现构建并记录完整来源。`linux-x64`、`darwin-arm64`、`linux-arm64` 和 Flatpak 兼容性不在本 change 验收范围，留待后续独立 change。
 - 对 AIO 增加一个可上游化的 POSIX ZIP 安装兼容修复，以安全保留或恢复经 manifest 验证的 Sidecar 可执行位；不改变 Windows 行为。
 - 不新增 AIO 全局 Capability Runtime，不改变 AIO LLM 对话运行时，不嵌入 DSH Web UI，不在本 change 实现 DSH 插件/Skill 市场或 AIO/VCP RAG 与 Knowledge 协同。
 
@@ -46,18 +46,20 @@ AIO 缺少面向代码任务的完整本地执行域，而 DeepSeek Harness（DS
 ## Impact
 
 - 新增独立仓库 `E:\workspace\projects\aiohub-plugin-dsh-workspace`；AIO 中 `plugins/dsh-coding-workspace` 仅为开发联接，不提交插件源码或 runtime 二进制。
-- 固定 DSH `dsh-v0.1.2-alpha.1` / `cd5ef8148158c3a752a658978873241fdf8e2bbc` 作为首个基线。当前无可固定的 `0.1.2a1` 官方 PyPI runtime/SDK wheel 或 GitHub Release 附件，因此首版允许从该官方源码基线进行项目构建；未来满足门禁的官方 wheel 自动优先。
-- 普通用户不需要另装 Node.js、Python、WSL2 或 DSH；每个平台包都携带其完整、已校验的 runtime 闭包、许可证、SBOM、来源与校验和。
-- `win32-x64`、glibc 2.28+ 的 `linux-x64`（AIO `.deb`/`.AppImage`）和 macOS 14+ `darwin-arm64` 为 Phase 1 支持目标；AIO Flatpak 为兼容性门禁通道，`linux-arm64` 为不宣称正式支持的预览通道。
+- 首发基线更新为 DSH `dsh-v0.1.2-rc.1` / `a66e4702047846cdaa10c66c9d3df3951f5ea70d` 的官方 Windows x64 `deepseek-harness-runtime-bin` wheel。唯一稳定事实源是 `runtime-lock/dsh-runtime.json`；解析器、打包器、release verifier、Supervisor 与复用测试不得硬编码 DSH 版本。CI 获取阶段校验固定 wheel URL/hash、闭包、SBOM 与上游许可证；离线运行阶段只使用已验证闭包，不得联网。
+- Windows x64 首发用户不需要另装 Node.js、Python、WSL2 或 DSH；该平台包必须携带完整、已校验的 runtime 闭包、许可证、SBOM、来源与校验和。
+- `win32-x64` 是本 change 唯一的首发支持目标。glibc 2.28+ 的 `linux-x64`（含 AIO `.deb`/`.AppImage`）、macOS 14+ `darwin-arm64`、`linux-arm64` 预览和 AIO Flatpak 兼容性均明确延后，不得由本 change 的 Windows 证据推断为已支持。
+- Windows 原生 E2E 是 GitHub Actions 门禁：构建 AIO debug binary 后，既有 Tauri WebDriver 通过生产插件安装与 resident Sidecar IPC 运行最终 ZIP；不新增 Coding工作站 UI，也不使用原生文件选择器或 mock layout 代替真实安装。若 WebDriver、端口或 runner 环境在任何测试用例开始前发生已分类的基础设施故障，且构建、打包、产物校验与 executable smoke 均通过，可记录 `infrastructure-blocked` 并临时豁免以继续 change；该状态不是产品测试通过，正式发布仍被阻止，直到 native E2E 补跑通过。
 - DSH 可在与 AIO LLM 对话相同的本地同用户信任级别接触真实密钥；密钥不得进入日志、事件、诊断、崩溃报告、会话正文或支持包。
 - AIO 核心原则上不变；仅在可复现失败证明公开扩展点不足时，允许实施隔离、默认兼容、可测试且可移除的最小兼容补丁。
+
 ```
 
 ## openspec/changes/integrate-dsh-runtime-core/design.md
 
 - Source: openspec/changes/integrate-dsh-runtime-core/design.md
-- Lines: 1-123
-- SHA256: b345290e51f8067a5f1caf422f255aa806a182f66686515fc61aa5d853014a2f
+- Lines: 1-142
+- SHA256: 1f892ef57da25964c70fbd3062f7f2a651008093c99df615a055439607d17890
 
 [TRUNCATED]
 
@@ -66,7 +68,7 @@ AIO 缺少面向代码任务的完整本地执行域，而 DeepSeek Harness（DS
 
 AIO `dev` 已提供 Plugin API v3 Resident Sidecar、宿主上下文握手、进程 generation、原生插件 UI route、异步 job/cancel 契约，以及通过 `aiohub-sdk` 读取完整 LLM Profile 的能力。`plugins/README.md` 明确插件应独立仓库管理，`docs/guide/plugins/index.md` 则定义了 JS、Native、Sidecar 三类插件、统一 executor、配置 schema 迁移和平台清单。
 
-DSH `dsh-v0.1.2-alpha.1`（`cd5ef8148158c3a752a658978873241fdf8e2bbc`）声明并在源码/CI 中实现 `win-x64`、`linux-x64`、`linux-arm64`、`macos-arm64` runtime 目标。当前公开持久渠道没有该精确版本的 SDK/runtime wheel 或 GitHub Release 二进制附件，因此“官方成品二进制直接打包”不能作为首版唯一来源。DSH 的 SDK stdio 又缺少取消、会话关闭和 runtime-to-host 审批等完整产品能力；启用 Web Remote API 会引入第二套 UI、HTTP/origin/auth 边界。故采用自有窄桥接，但不复制 DSH Agent 语义。
+DSH `dsh-v0.1.2-rc.1`（`a66e4702047846cdaa10c66c9d3df3951f5ea70d`）及其官方 Windows x64 `deepseek-harness-runtime-bin` wheel 是首发 runtime 基线；旧 prerelease 源码构建路线不得进入 release lock、包、CI 或测试。DSH 的 SDK stdio 仍缺少取消、会话关闭和 runtime-to-host 审批等完整产品能力；启用 Web Remote API 会引入第二套 UI、HTTP/origin/auth 边界。故采用自有窄桥接，但不复制 DSH Agent 语义。
 
 代码权威位置为独立仓库 `E:\workspace\projects\aiohub-plugin-dsh-workspace`。AIO `plugins/dsh-coding-workspace` 只作为开发 junction；生产以当前平台的独立 ZIP 安装到 AIO 插件目录。
 
@@ -76,7 +78,7 @@ DSH `dsh-v0.1.2-alpha.1`（`cd5ef8148158c3a752a658978873241fdf8e2bbc`）声明�
 
 - 将 DSH 作为 AIO 托管、可销毁、可重建的完整 Coding 执行域，而非拆分成 AIO 工具。
 - AIO 统一 UI、模型 Profile、工作区、设置与外层生命周期；DSH 独占 Agent Loop、持久会话、prompt、上下文/压缩、工具、安全策略、工作流与子 Agent。
-- Phase 1 在 Windows x64、Linux x64 和 macOS arm64 提供离线确定性安装；Linux arm64 产出预览包。
+- 本 change 的首发只在 Windows x64 提供离线确定性安装。Linux x64、macOS arm64、Linux arm64 预览与 Flatpak 兼容性移交后续独立 change；现有跨平台抽象不构成支持声明。
 - 以稳定协议、明确所有权、租约和快照恢复支持未来接入 AIO 全局 Capability Runtime。
 - 避免 AIO/DSH 破坏兼容性变更；只有公共 seam 被可复现地证明不足时才使用最小补丁。
 
@@ -117,19 +119,21 @@ DSH durable log、start/completed facts 与 snapshot 是权威；delta 是可丢
 
 ### 4. Runtime 供应链与平台包
 
-runtime lock 固定 DSH tag、commit、artifact source、toolchain、platform、hash、license、SBOM、contract/profile version。流水线先查询精确兼容的官方 wheel；只有其持久可获取且通过 release-shaped 黑盒门禁才采用。否则从固定官方源码在目标平台原生构建，明确标记 project-built。Actions 临时 artifact、源码 archive 或移动分支均不能直接作为 runtime。
+稳定路径 `runtime-lock/dsh-runtime.json` 固定 DSH tag、commit、官方 wheel URL/hash、platform、提取后文件 hash、license/notices、SBOM、contract/profile version。所有消费者从 lock 派生版本身份，不含 DSH 版本常量；升级只替换 lock 及其派生产物。Actions 临时 artifact、源码 archive、移动分支或源码构建 fallback 均不能直接作为首发 runtime。
+
+官方 wheel 的固定 SHA-256 为 `390bd8cd5f8700fc609c58e1ccb78091d5c8c6e11c21656e284e0f68da0e148f`。获取器必须先校验完整 wheel，再动态发现其版本化 `.dist-info` 目录，仅提取 Windows x64 主程序、`-rg.exe`、MIT LICENSE 与 `THIRD_PARTY_NOTICES.md`，生成 SBOM 后逐项匹配 lock。版本化 wheel 内部目录不得硬编码，CI 不 checkout DSH 源码，也不依赖本地 `dist-exe/`。
 
 每个平台发布一个 ZIP，plugin id/version/contract/profile 相同：
 
 | Platform | Phase 1 状态 | 宿主约束 |
 |---|---|---|
-| `win32-x64` | Supported | Windows x64 |
-| `linux-x64` | Supported | glibc 2.28+；AIO `.deb` / `.AppImage` |
-| `darwin-arm64` | Supported | macOS 14+ |
-| `linux-arm64` | Preview | 等待普通 AIO ARM64 桌面包与全套集成 |
+| `win32-x64` | Supported | Windows x64；本 change 的唯一首发平台 |
+| `linux-x64` | Deferred | 后续 change：glibc 2.28+、AIO `.deb` / `.AppImage` 原生门禁 |
+| `darwin-arm64` | Deferred | 后续 change：macOS 14+ 原生门禁 |
+| `linux-arm64` | Deferred | 后续 change：预览 artifact 与原生 smoke，不得宣称 supported |
 | others | Unsupported | 启动前显式拒绝 |
 
-AIO Flatpak 是 Phase 1 兼容性测试通道，不自动继承 Linux supported 标签。必须验证 executable、嵌套文件、shell、document portal、workspace 访问、bwrap/Landlock；失败则准确标为 preview/unsupported，不放宽 DSH 沙箱。
+AIO Flatpak 不在本 change 的首发兼容性范围。后续 change 必须独立验证 executable、嵌套文件、shell、document portal、workspace 访问与 bwrap/Landlock；在完成前不得继承任何 Linux support 标签，也不得放宽 DSH 沙箱。
 
 ### 5. AIO POSIX 安装兼容补丁
 
@@ -141,7 +145,6 @@ AIO Flatpak 是 Phase 1 兼容性测试通道，不自动继承 Linux supported 
 
 在当前 AIO 没有通用模型 broker/secret vault 的前提下，Supervisor 在插件 `DSH_HOME` 中通过官方 credential seam 维护最小凭据镜像。写入原子替换，Windows 用 owner DACL，POSIX 用 `0600`；切换或解绑清除 stale refs。普通事件只含 opaque refs，所有日志、stderr、环境、崩溃与支持包统一脱敏。未来 AIO broker/vault 可替换 `ModelTransport`/`CredentialProvider`，不改变 UI 或 DSH session。
 
-每个 Turn 开始时冻结 route/model/non-secret parameters、用户 prompt contribution、workspace 和 permission/sandbox policy；该 generation 跨 step、retry、tool 和 compaction 不变。修改只影响同 session 的下一个 Turn。凭据值允许按模型 operation 轮换，但 route identity 不变。
 ```
 
 Full source: openspec/changes/integrate-dsh-runtime-core/design.md
@@ -149,69 +152,73 @@ Full source: openspec/changes/integrate-dsh-runtime-core/design.md
 ## openspec/changes/integrate-dsh-runtime-core/tasks.md
 
 - Source: openspec/changes/integrate-dsh-runtime-core/tasks.md
-- Lines: 1-59
-- SHA256: ca5fcf0d2c13a80d9ded3fbf117aa26e9e4639eb79bc686456c64d220260e9fa
+- Lines: 1-62
+- SHA256: aaf3564bea25cc0f1187db1edaf98925280b4b5eb90ba49569e2e24b0062f8f1
 
 ```md
 ## 1. Repository, contracts, and packaging foundation
 
-- [ ] 1.1 Initialize `aiohub-plugin-dsh-workspace` as an independent repository with license, contribution guidance, pinned Rust/Node/Bun/DSH toolchains, and an AIO `AGENTS.md` derived from the plugin template.
-- [ ] 1.2 Add idempotent scripts for creating/removing the development junction at `aio-hub/plugins/dsh-coding-workspace` without committing plugin files to AIO.
-- [ ] 1.3 Define the Plugin API v3 Sidecar manifest, plugin-local `RuntimeFacade`, stable `execution-domain:dsh` capability descriptor, and platform-neutral DTO package.
-- [ ] 1.4 Define the Rust protocol crate as the single contract source; generate JSON Schema and TypeScript declarations, calculate a contract hash, and add generated-file drift checks.
+- [x] 1.1 Initialize `aiohub-plugin-dsh-workspace` as an independent repository with license, contribution guidance, pinned Rust/Node/Bun/DSH toolchains, and an AIO `AGENTS.md` derived from the plugin template.
+- [x] 1.2 Add idempotent scripts for creating/removing the development junction at `aio-hub/plugins/dsh-coding-workspace` without committing plugin files to AIO.
+- [x] 1.3 Define the Plugin API v3 Sidecar manifest, plugin-local `RuntimeFacade`, stable `execution-domain:dsh` capability descriptor, and platform-neutral DTO package.
+- [x] 1.4 Define the Rust protocol crate as the single contract source; generate JSON Schema and TypeScript declarations, calculate a contract hash, and add generated-file drift checks.
 
 ## 2. Reproducible DSH runtime supply chain
 
-- [ ] 2.1 Pin DSH `dsh-v0.1.2-alpha.1` / `cd5ef8148158c3a752a658978873241fdf8e2bbc` in a versioned runtime lock with platform, provenance, toolchain, checksum, license, SBOM, profile, contract, and supported AIO ranges.
-- [ ] 2.2 Implement official exact-wheel discovery and verification, with native reproducible source-build fallback that is explicitly labeled project-built.
-- [ ] 2.3 Build fully offline per-platform ZIPs for `win32-x64`, glibc 2.28+ `linux-x64`, and macOS 14+ `darwin-arm64`; build a separately labeled `linux-arm64` preview ZIP.
-- [ ] 2.4 Reject temporary CI artifacts, moving refs, wrong architecture, missing helpers, checksum mismatch, unsupported licenses, and runtime/profile/contract incompatibility before packaging or startup.
-- [ ] 2.5 Add release-shaped black-box gates for each artifact using an installed runtime, clean plugin data directory, mock model Provider, provenance verification, and SBOM/license checks.
+- [x] 2.1 Pin DSH `dsh-v0.1.2-rc.1` / `a66e4702047846cdaa10c66c9d3df3951f5ea70d` and its official Windows x64 wheel in stable `runtime-lock/dsh-runtime.json`, including platform, provenance, wheel/file checksums, upstream license/notices, SBOM, profile, contract, and supported AIO ranges; version consumers MUST derive identity from the lock rather than hard-code it.
+- [x] 2.2 Implement exact official-wheel acquisition and fail-closed verification. The acquisition stage MAY use the network only for the lock-pinned wheel, MUST verify the wheel before dynamically discovering its versioned metadata directory, and MUST produce only the audited main executable, `-rg.exe`, upstream license/notices and SBOM before the separately offline test stage; no source-build fallback is allowed.
+- [x] 2.3 Build a fully offline `win32-x64` ZIP containing the manifest-selected Supervisor, verified runtime closure, platform-scoped lock, persisted SHA-256, SBOM, license bundle, provenance, and support-result JSON.
+- [x] 2.4 Reject temporary CI artifacts, moving refs, wrong architecture, missing helpers, checksum mismatch, unsupported licenses, and runtime/profile/contract incompatibility before packaging or startup.
+- [x] 2.5 Add release-shaped black-box gates for each artifact using an installed runtime, clean plugin data directory, mock model Provider, provenance verification, and SBOM/license checks.
 
 ## 3. Minimal AIO POSIX installer compatibility patch
 
-- [ ] 3.1 Add a failing Linux/macOS test demonstrating that ZIP-installed manifest-selected Sidecar binaries lose executable permission under the current installer.
-- [ ] 3.2 Implement the narrow installer fix that preserves safe regular-file mode or restores executable permission only for validated current-platform Native/Sidecar executables and required helpers.
-- [ ] 3.3 Retain path traversal validation, reject symlinks/special files, keep Windows behavior unchanged, and add install-and-launch regressions for Linux/macOS.
+- [x] 3.1 Add a failing Linux/macOS test demonstrating that ZIP-installed manifest-selected Sidecar binaries lose executable permission under the current installer.
+- [x] 3.2 Implement the narrow installer fix that preserves safe regular-file mode or restores executable permission only for validated current-platform Native/Sidecar executables and required helpers.
+- [x] 3.3 Retain path traversal validation, reject symlinks/special files, keep Windows behavior unchanged, and add install-and-launch regressions for Linux/macOS.
 
 ## 4. Cross-platform Supervisor lifecycle
 
-- [ ] 4.1 Implement stdout-pure Sidecar v3 initialization, runtime validation, health/readiness, structured diagnostics, stable/experimental capability negotiation, and generation fencing.
-- [ ] 4.2 Derive a plugin-owned DSH Home from `AIOHUB_PLUGIN_DATA_DIR`; create data, session, credential, runtime, log, and temp boundaries with Windows DACL and POSIX `0700`/`0600` modes.
-- [ ] 4.3 Implement Windows Job Object/DACL and Linux/macOS process-group TERM/KILL backends with bounded shutdown, full descendant cleanup, non-ASCII/long path support, and no console leakage.
-- [ ] 4.4 Implement stopped, starting, ready, busy, stopping, crashed, and unavailable states with idempotent operations and `domainGenerationId` isolation.
-- [ ] 4.5 Implement on-demand start, optional prewarm without session/model activity, authoritative quiescence checks, controller/prewarm leases, 10-minute idle grace, flush/dispose, and process-tree teardown.
-- [ ] 4.6 Implement crash-loop protection and interrupted-Turn recovery that may restore readiness but never automatically replays prompts, model calls, or tool effects.
-- [ ] 4.7 Disable DSH telemetry by default and ensure support diagnostics redact credentials, authorization headers, query secrets, environment data, child output, crash records, and credential documents.
+- [x] 4.1 Implement stdout-pure Sidecar v3 initialization, runtime validation, health/readiness, structured diagnostics, stable/experimental capability negotiation, generation fencing, and the Windows-native E2E JSONL ABI.
+- [x] 4.2 Derive a plugin-owned DSH Home from `AIOHUB_PLUGIN_DATA_DIR`; create data, session, credential, runtime, log, and temp boundaries with Windows DACL and POSIX `0700`/`0600` modes.
+- [x] 4.3 Implement Windows Job Object/DACL and Linux/macOS process-group TERM/KILL backends with bounded shutdown, full descendant cleanup, non-ASCII/long path support, and no console leakage.
+- [x] 4.4 Implement stopped, starting, ready, busy, stopping, crashed, and unavailable states with idempotent operations and `domainGenerationId` isolation.
+- [x] 4.5 Implement on-demand start, optional prewarm without session/model activity, authoritative quiescence checks, controller/prewarm leases, 10-minute idle grace, flush/dispose, and process-tree teardown.
+- [x] 4.6 Implement crash-loop protection and interrupted-Turn recovery that may restore readiness but never automatically replays prompts, model calls, or tool effects.
+- [x] 4.7 Disable DSH telemetry by default and ensure support diagnostics redact credentials, authorization headers, query secrets, environment data, child output, crash records, and credential documents.
 
 ## 5. Full DSH execution-domain bridge
 
-- [ ] 5.1 Add the managed `aio-coding` profile over `dsh-base` using public Cordis composition and project patch; load no Web UI or competing SDK stdio transport.
-- [ ] 5.2 Implement JSONL initialize, command/response/notification/interaction frames with protocol version, contract hash, generation, sequence, and DSH-native correlation identifiers.
-- [ ] 5.3 Implement one mutable controller lease per session, read-only observers, explicit transfer/release, and generation-plus-lease fencing for all mutations and interaction responses.
-- [ ] 5.4 Bridge session create/resume/list/search/history/prompt/cancel/steer/fork/queue/rename/model/workspace operations through public DSH services.
-- [ ] 5.5 Bridge lifecycle, message, reasoning, tool, workflow, sub-agent, context, compaction, error, approval, and user-question events while preserving DSH durable facts.
-- [ ] 5.6 Implement authoritative snapshot-plus-cursor recovery, duplicate/gap handling, UI remount recovery, bounded queues, disposable delta coalescing, overload diagnostics, and reconnect backoff.
-- [ ] 5.7 Implement interaction correlation and terminal `interaction/resolved` cleanup for allow, deny, answer, cancel, timeout, lease transfer, Turn cancellation, and domain restart.
+- [x] 5.1 Add the managed `aio-coding` profile over `dsh-base` using public Cordis composition and project patch; load no Web UI or competing SDK stdio transport.
+- [x] 5.2 Implement JSONL initialize, command/response/notification/interaction frames with protocol version, contract hash, generation, sequence, and DSH-native correlation identifiers.
+- [x] 5.3 Implement one mutable controller lease per session, read-only observers, explicit transfer/release, and generation-plus-lease fencing for all mutations and interaction responses.
+- [x] 5.4 Bridge session create/resume/list/search/history/prompt/cancel/steer/fork/queue/rename/model/workspace operations through public DSH services.
+- [x] 5.5 Bridge lifecycle, message, reasoning, tool, workflow, sub-agent, context, compaction, error, approval, and user-question events while preserving DSH durable facts.
+- [x] 5.6 Implement authoritative snapshot-plus-cursor recovery, duplicate/gap handling, UI remount recovery, bounded queues, disposable delta coalescing, overload diagnostics, and reconnect backoff.
+- [x] 5.7 Implement interaction correlation and terminal `interaction/resolved` cleanup for allow, deny, answer, cancel, timeout, lease transfer, Turn cancellation, and domain restart.
 
 ## 6. AIO model, credential, prompt, and policy integration
 
-- [ ] 6.1 Implement explicit versioned `AioProfileAdapter` validation and the mandatory VCP/OpenAI-compatible Chat Completions mapping, including Base URL, model, headers, stream/tool/error/cancel semantics, and unsupported-field diagnostics.
-- [ ] 6.2 Add other Provider adapters only with complete mappings and black-box tests; forbid name-based routing, inferred endpoints, silent field dropping, and heuristic fallback.
-- [ ] 6.3 Implement atomic minimal credential mirror writes through the official DSH seam, owner-only ACL/modes, per-operation key rotation, stale-reference cleanup, and user-triggered mirror clearing.
-- [ ] 6.4 Implement Turn-start immutable snapshots for route/model/parameters, System Prompt contribution, workspace, permission, and sandbox policy; apply edits only to the next Turn in the same session.
-- [ ] 6.5 Inject the user System Prompt contribution through DSH's public assembly waterfall while keeping DSH's identity, tool, runtime, repository, and Skill assembly authority intact.
-- [ ] 6.6 Implement and byte-test the scoped literal-placeholder codec for `{{Nova}}` and edge cases only if required by the pinned DSH interpolator; prefer and migrate to an upstream literal escape when available.
-- [ ] 6.7 Set default policy to `workspace-write + ask`, require explicit non-persistent full access, expose DSH sandbox `full`/`partial`, and fail closed when required platform sandbox support is unavailable.
+- [x] 6.1 Implement explicit versioned `AioProfileAdapter` validation and the mandatory VCP/OpenAI-compatible Chat Completions mapping, including Base URL, model, headers, stream/tool/error/cancel semantics, and unsupported-field diagnostics.
+- [x] 6.2 Add other Provider adapters only with complete mappings and black-box tests; forbid name-based routing, inferred endpoints, silent field dropping, and heuristic fallback.
+- [x] 6.3 Implement atomic minimal credential mirror writes through the official DSH seam, owner-only ACL/modes, per-operation key rotation, stale-reference cleanup, and user-triggered mirror clearing.
+- [x] 6.4 Implement Turn-start immutable snapshots for route/model/parameters, System Prompt contribution, workspace, permission, and sandbox policy; apply edits only to the next Turn in the same session.
+- [x] 6.5 Inject the user System Prompt contribution through DSH's public assembly waterfall while keeping DSH's identity, tool, runtime, repository, and Skill assembly authority intact.
+- [x] 6.6 Implement and byte-test the scoped literal-placeholder codec for `{{Nova}}` and edge cases only if required by the pinned DSH interpolator; prefer and migrate to an upstream literal escape when available.
+- [x] 6.7 Set default policy to `workspace-write + ask`, require explicit non-persistent full access, expose DSH sandbox `full`/`partial`, and fail closed when required platform sandbox support is unavailable.
 
 ## 7. Verification, compatibility, and release readiness
 
-- [ ] 7.1 Add unit/property tests for contract generation, lifecycle transitions, leases, generation fencing, path isolation, ACL/modes, redaction, profile mapping, prompt codec, Turn snapshots, event sequencing, and backpressure.
-- [ ] 7.2 Add deterministic fake-AIO/fake-DSH contract tests for cancellation, approvals, questions, controller transfer, reconnect, gaps, overload, crash, cold resume, and stale frames.
-- [ ] 7.3 Add native end-to-end tests on Windows x64, Linux x64, and macOS arm64 covering clean ZIP install, offline cold start, mock-provider coding Turn, descendants, flush, crash interruption, resume, upgrade, rollback, uninstall, and data preservation.
-- [ ] 7.4 Add AIO `.deb` and `.AppImage` tests on glibc 2.28+; run a distinct Flatpak matrix for executable, nested filesystem, shell, document portal, workspace access, bwrap/Landlock, and accurate support diagnostics.
-- [ ] 7.5 Run Linux ARM64 preview artifact tests without promoting it to supported until a normal AIO ARM64 desktop host and complete native integration lane exist.
-- [ ] 7.6 Document platform matrix, installation, development junction, runtime provenance, trust/sandbox boundaries, model compatibility, diagnostics, recovery, data retention, and the future Capability Runtime/model broker replacement interfaces.
+- [x] 7.1 Add unit/property tests for contract generation, lifecycle transitions, leases, generation fencing, path isolation, ACL/modes, redaction, profile mapping, prompt codec, Turn snapshots, event sequencing, and backpressure.
+- [x] 7.2 Add deterministic fake-AIO/fake-DSH contract tests for cancellation, approvals, questions, controller transfer, reconnect, gaps, overload, crash, cold resume, and stale frames.
+- [x] 7.3 Add native Windows x64 end-to-end tests covering clean ZIP installation through the AIO installer, offline cold start, real handshake, mock-provider coding Turn, descendants, flush, crash interruption, resume, upgrade, rollback, uninstall, and data preservation.
+- [ ] 7.4 Add a required Windows GitHub Actions lane that builds the AIO debug binary, supplies the Tauri frontend origin, isolated app-data root and WebDriver port, then runs the production-IPC native E2E with network disabled during the runtime test stage and uploads only redacted reports, checksums, and test results.
+- [x] 7.6 Document platform matrix, installation, development junction, runtime provenance, trust/sandbox boundaries, model compatibility, diagnostics, recovery, data retention, and the future Capability Runtime/model broker replacement interfaces.
+
+### Deferred platform scope
+
+`linux-x64` (including AIO `.deb`/`.AppImage`), `darwin-arm64`, `linux-arm64` preview, and Flatpak compatibility were intentionally removed from this change's release acceptance on 2026-09-02. A later, separately approved change must supply their artifacts and native gates; until then they remain unsupported and are not represented by completed tasks here.
+
 ```
 
 ## openspec/changes/integrate-dsh-runtime-core/specs/dsh-execution-bridge/spec.md
@@ -303,6 +310,7 @@ DSH 的 durable events、开始/完成事实和 snapshots SHALL 是恢复依据�
 AIO UI SHALL 只依赖插件本地、无 Vue/Pinia 类型的 `RuntimeFacade` 和版本化 DTO。Facade SHALL 以稳定 capability id `execution-domain:dsh` 描述执行域，并保持可被未来 AIO 全局 Capability Runtime 注册或替换；它 MUST NOT 替换或冒充 AIO RP-first `conversation-runtime:default`。
 
 #### Scenario: 未来接入全局 Capability Runtime
+
 ```
 
 Full source: openspec/changes/integrate-dsh-runtime-core/specs/dsh-execution-bridge/spec.md
@@ -389,21 +397,22 @@ DSH SHALL 保持 System Prompt 的唯一组装权。系统 MAY 通过 DSH 公共
 #### Scenario: compaction 发生
 - **WHEN** DSH 在活动 Turn 内压缩上下文
 - **THEN** 压缩由 DSH 独立完成，且不会重新读取或替换该 Turn 的 AIO 配置快照
+
 ```
 
 ## openspec/changes/integrate-dsh-runtime-core/specs/dsh-runtime-lifecycle/spec.md
 
 - Source: openspec/changes/integrate-dsh-runtime-core/specs/dsh-runtime-lifecycle/spec.md
-- Lines: 1-87
-- SHA256: 5e064a600ec0f44a4361a61fc067f73e7a7d46e3351edf4f00b1a4b2bb0cb304
+- Lines: 1-94
+- SHA256: 0e1d071a4b4e651aa752f2022e4d1781848ba1fc144cfa0324f49a8ed9b5edfa
 
 [TRUNCATED]
 
 ```md
 ## ADDED Requirements
 
-### Requirement: 可复现且离线的多平台运行时
-系统 SHALL 为每个目标平台发布独立 ZIP，并携带固定 DSH 版本、commit、runtime 闭包、来源类型、构建工具链、SHA-256、许可证与 SBOM。构建流水线 SHALL 优先采用精确兼容且通过门禁的官方平台 wheel；不存在时 MAY 从固定官方 tag/commit 原生构建，并 MUST 将产物标记为项目构建而非上游发布。用户首次启动 MUST NOT 下载 runtime，也不得要求系统已安装 Node.js、Python、WSL2 或 DSH。
+### Requirement: 可复现且离线的 Windows x64 运行时
+系统 SHALL 为 `win32-x64` 发布独立 ZIP，并携带固定 DSH 版本、commit、manifest-selected Supervisor、完整 runtime 闭包、来源类型、构建工具链、持久化 SHA-256、许可证与 SBOM。构建流水线 SHALL 优先采用精确兼容且通过门禁的官方平台 wheel；不存在时 MAY 从固定官方 tag/commit 原生构建，并 MUST 将产物标记为项目构建而非上游发布。用户首次启动 MUST NOT 下载 runtime，也不得要求系统已安装 Node.js、Python、WSL2 或 DSH。
 
 #### Scenario: 官方 wheel 可用
 - **WHEN** 精确版本和平台的官方 wheel 可下载且通过来源、完整性、许可证与黑盒测试
@@ -417,20 +426,12 @@ DSH SHALL 保持 System Prompt 的唯一组装权。系统 MAY 通过 DSH 公共
 - **WHEN** runtime 实际校验和、契约哈希或平台描述与 lock 不一致
 - **THEN** Supervisor 拒绝执行，保持工作区和持久会话不变，并返回不含秘密的修复诊断
 
-### Requirement: 明确的平台支持矩阵
-Phase 1 SHALL 完整支持 `win32-x64`、glibc 2.28+ 的 `linux-x64` 和 macOS 14+ 的 `darwin-arm64`。`linux-arm64` MAY 发布预览 ZIP，但 MUST NOT 在普通 AIO Linux arm64 桌面宿主和全套集成测试存在前宣称正式支持。其他平台 SHALL 明确失败，不得选择名称相近的 runtime。
+### Requirement: 明确的 Windows x64 首发支持矩阵
+本 change SHALL 只完整支持 `win32-x64`。glibc 2.28+ 的 `linux-x64`、macOS 14+ 的 `darwin-arm64`、`linux-arm64` 预览和 AIO Flatpak 兼容性 MUST 由后续独立 change 实现与验证；本 change 不得将 Windows 证据或通用代码路径表述为这些平台的支持。其他平台 SHALL 明确失败，不得选择名称相近的 runtime。
 
-#### Scenario: AIO Linux 正式包启动
-- **WHEN** 用户从 AIO `.deb` 或 `.AppImage` 在满足 glibc 基线的 `linux-x64` 主机启动 Coding工作站
-- **THEN** 系统选择 `linux-x64` runtime 并通过与 Windows/macOS 相同的协议、生命周期和安全门禁
-
-#### Scenario: Flatpak 环境
-- **WHEN** Coding工作站运行于 AIO Flatpak
-- **THEN** 系统先验证 Sidecar 执行、嵌套文件系统、shell、document portal、workspace 权限及 DSH sandbox；任一必需项失败时显示 unsupported/preview 诊断，不为获得支持标签而放宽沙箱
-
-#### Scenario: Linux ARM64 预览包
-- **WHEN** 用户检查 `linux-arm64` 构建产物
-- **THEN** 产物标记为 preview，并说明尚无普通 AIO Linux ARM64 桌面发行与完整宿主集成保证
+#### Scenario: 延后平台启动
+- **WHEN** 用户在 `linux-x64`、`darwin-arm64`、`linux-arm64` 或 Flatpak 环境启动 Coding工作站
+- **THEN** 系统明确报告该平台尚未由此首发支持，不尝试跨架构或降级运行，也不放宽 sandbox
 
 #### Scenario: 未支持平台
 - **WHEN** 平台为 `darwin-x64`、`win32-arm64` 或其他未列入支持矩阵的组合
@@ -451,8 +452,8 @@ Phase 1 SHALL 完整支持 `win32-x64`、glibc 2.28+ 的 `linux-x64` 和 macOS 1
 - **WHEN** 最后一个控制租约已释放、没有 pending interaction/job，且 DSH 权威状态持续静止 10 分钟
 - **THEN** Supervisor 有界地刷新持久化、dispose Cordis 并回收完整进程树
 
-### Requirement: 受管生命周期、崩溃语义与平台进程后端
-Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed 和 unavailable 状态，并使用 `domainGenerationId` 隔离每次启动。Windows SHALL 使用 Job Object 与 DACL；Linux/macOS SHALL 使用进程组和有界 TERM/KILL。DSH 意外退出后 MAY 自动恢复 runtime readiness，但 MUST NOT 自动重放活动任务；受影响 Turn SHALL 标记为 interrupted，并由用户在新 Turn 中显式继续。
+### Requirement: 受管生命周期、崩溃语义与 Windows 进程后端
+Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed 和 unavailable 状态，并使用 `domainGenerationId` 隔离每次启动。首发 Windows SHALL 使用 Job Object 与 DACL。DSH 意外退出后 MAY 自动恢复 runtime readiness，但 MUST NOT 自动重放活动任务；受影响 Turn SHALL 标记为 interrupted，并由用户在新 Turn 中显式继续。
 
 #### Scenario: 正常停止
 - **WHEN** 用户停止执行域、禁用插件或退出 AIO
@@ -467,7 +468,7 @@ Supervisor SHALL 管理 stopped、starting、ready、busy、stopping、crashed �
 - **THEN** Supervisor 按 `domainGenerationId` 丢弃该输出，不改变新代际会话或作业状态
 
 ### Requirement: 权威沙箱与显式安全状态
-DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。Linux SHALL 优先使用 bwrap、再使用 Landlock；macOS SHALL 使用 Seatbelt；Windows SHALL 使用 ACL/受限 token 能力。必需沙箱不可用时执行 SHALL fail closed，UI SHALL 明确显示 `full` 或 `partial` 隔离状态，不得把 Sidecar 生命周期机制描述为安全沙箱。
+DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。首发 Windows SHALL 使用 ACL/受限 token 能力。必需沙箱不可用时执行 SHALL fail closed，UI SHALL 明确显示 `full` 或 `partial` 隔离状态，不得把 Sidecar 生命周期机制描述为安全沙箱。Linux 的 bwrap/Landlock 与 macOS Seatbelt 验证由后续平台扩展 change 承担。
 
 #### Scenario: 必需沙箱不可用
 - **WHEN** 当前平台无法建立所选权限模式要求的 DSH 沙箱
@@ -480,7 +481,15 @@ DSH SHALL 保持工具权限、审批和沙箱的唯一裁决权。Linux SHALL �
 ### Requirement: 隔离数据、可回退升级与 POSIX 安装兼容
 系统 SHALL 将 DSH Home、凭据镜像、桥接状态和临时文件放入插件拥有的隔离目录，并在升级失败时保留最后可用 runtime 与持久会话。POSIX 上 AIO ZIP 安装器 SHALL 安全保留普通文件的 Unix mode，或仅为 manifest 选中的当前平台 Native/Sidecar 二进制恢复可执行位；路径校验 MUST 保持不变并 MUST 拒绝 symlink 与特殊文件，Windows 行为不得改变。
 
+#### Scenario: 未来 POSIX 安装并启动 Sidecar
+- **WHEN** 后续平台扩展 change 启用 Linux 或 macOS 插件 ZIP 安装
+- **THEN** 经 manifest 验证的 Supervisor 和必要 helper 必须具备可执行权限，且未被选中的数据文件不会被任意提升权限；此条件不构成当前 Windows 首发的支持声明
+
+#### Scenario: 升级握手失败
+- **WHEN** 新 runtime 或 bridge 无法通过校验、契约握手或冒烟测试
+- **THEN** 系统回退最后可用版本，不迁移或删除原会话，并显示失败原因
+
+
 ```
 
 Full source: openspec/changes/integrate-dsh-runtime-core/specs/dsh-runtime-lifecycle/spec.md
-

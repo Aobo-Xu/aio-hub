@@ -7,9 +7,9 @@
 
 ## 2. Reproducible DSH runtime supply chain
 
-- [x] 2.1 Pin DSH `dsh-v0.1.2-alpha.1` / `cd5ef8148158c3a752a658978873241fdf8e2bbc` in a versioned runtime lock with platform, provenance, toolchain, checksum, license, SBOM, profile, contract, and supported AIO ranges.
-- [x] 2.2 Implement official exact-wheel discovery and verification, with native reproducible source-build fallback that is explicitly labeled project-built.
-- [ ] 2.3 Build fully offline per-platform ZIPs for `win32-x64`, glibc 2.28+ `linux-x64`, and macOS 14+ `darwin-arm64`; build a separately labeled `linux-arm64` preview ZIP.
+- [x] 2.1 Pin DSH `dsh-v0.1.2-rc.1` / `a66e4702047846cdaa10c66c9d3df3951f5ea70d` and its official Windows x64 wheel in stable `runtime-lock/dsh-runtime.json`, including platform, provenance, wheel/file checksums, upstream license/notices, SBOM, profile, contract, and supported AIO ranges; version consumers MUST derive identity from the lock rather than hard-code it.
+- [x] 2.2 Implement exact official-wheel acquisition and fail-closed verification. The acquisition stage MAY use the network only for the lock-pinned wheel, MUST verify the wheel before dynamically discovering its versioned metadata directory, and MUST produce only the audited main executable, `-rg.exe`, upstream license/notices and SBOM before the separately offline test stage; no source-build fallback is allowed.
+- [x] 2.3 Build a fully offline `win32-x64` ZIP containing the manifest-selected Supervisor, verified runtime closure, platform-scoped lock, persisted SHA-256, SBOM, license bundle, provenance, and support-result JSON.
 - [x] 2.4 Reject temporary CI artifacts, moving refs, wrong architecture, missing helpers, checksum mismatch, unsupported licenses, and runtime/profile/contract incompatibility before packaging or startup.
 - [x] 2.5 Add release-shaped black-box gates for each artifact using an installed runtime, clean plugin data directory, mock model Provider, provenance verification, and SBOM/license checks.
 
@@ -21,7 +21,7 @@
 
 ## 4. Cross-platform Supervisor lifecycle
 
-- [x] 4.1 Implement stdout-pure Sidecar v3 initialization, runtime validation, health/readiness, structured diagnostics, stable/experimental capability negotiation, and generation fencing.
+- [x] 4.1 Implement stdout-pure Sidecar v3 initialization, runtime validation, health/readiness, structured diagnostics, stable/experimental capability negotiation, generation fencing, and the Windows-native E2E JSONL ABI.
 - [x] 4.2 Derive a plugin-owned DSH Home from `AIOHUB_PLUGIN_DATA_DIR`; create data, session, credential, runtime, log, and temp boundaries with Windows DACL and POSIX `0700`/`0600` modes.
 - [x] 4.3 Implement Windows Job Object/DACL and Linux/macOS process-group TERM/KILL backends with bounded shutdown, full descendant cleanup, non-ASCII/long path support, and no console leakage.
 - [x] 4.4 Implement stopped, starting, ready, busy, stopping, crashed, and unavailable states with idempotent operations and `domainGenerationId` isolation.
@@ -53,7 +53,10 @@
 
 - [x] 7.1 Add unit/property tests for contract generation, lifecycle transitions, leases, generation fencing, path isolation, ACL/modes, redaction, profile mapping, prompt codec, Turn snapshots, event sequencing, and backpressure.
 - [x] 7.2 Add deterministic fake-AIO/fake-DSH contract tests for cancellation, approvals, questions, controller transfer, reconnect, gaps, overload, crash, cold resume, and stale frames.
-- [ ] 7.3 Add native end-to-end tests on Windows x64, Linux x64, and macOS arm64 covering clean ZIP install, offline cold start, mock-provider coding Turn, descendants, flush, crash interruption, resume, upgrade, rollback, uninstall, and data preservation.
-- [ ] 7.4 Add AIO `.deb` and `.AppImage` tests on glibc 2.28+; run a distinct Flatpak matrix for executable, nested filesystem, shell, document portal, workspace access, bwrap/Landlock, and accurate support diagnostics.
-- [ ] 7.5 Run Linux ARM64 preview artifact tests without promoting it to supported until a normal AIO ARM64 desktop host and complete native integration lane exist.
-- [ ] 7.6 Document platform matrix, installation, development junction, runtime provenance, trust/sandbox boundaries, model compatibility, diagnostics, recovery, data retention, and the future Capability Runtime/model broker replacement interfaces.
+- [x] 7.3 Add native Windows x64 end-to-end tests covering clean ZIP installation through the AIO installer, offline cold start, real handshake, mock-provider coding Turn, descendants, flush, crash interruption, resume, upgrade, rollback, uninstall, and data preservation.
+- [ ] 7.4 Add a required Windows GitHub Actions lane that builds the AIO debug binary, supplies the Tauri frontend origin, isolated app-data root and WebDriver port, then runs the production-IPC native E2E with network disabled during the runtime test stage and uploads only redacted reports, checksums, and test results.
+- [x] 7.6 Document platform matrix, installation, development junction, runtime provenance, trust/sandbox boundaries, model compatibility, diagnostics, recovery, data retention, and the future Capability Runtime/model broker replacement interfaces.
+
+### Deferred platform scope
+
+`linux-x64` (including AIO `.deb`/`.AppImage`), `darwin-arm64`, `linux-arm64` preview, and Flatpak compatibility were intentionally removed from this change's release acceptance on 2026-09-02. A later, separately approved change must supply their artifacts and native gates; until then they remain unsupported and are not represented by completed tasks here.
