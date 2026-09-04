@@ -164,13 +164,44 @@ jobs:
           $ErrorActionPreference = "Stop"
           Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue |
             Remove-NetFirewallRule
-          New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -RemoteAddress Internet | Out-Null
+          $externalInterfaces = @(
+            Get-NetIPConfiguration |
+              Where-Object { $_.IPv4DefaultGateway -or $_.IPv6DefaultGateway } |
+              Select-Object -ExpandProperty InterfaceAlias -Unique
+          )
+          if ($externalInterfaces.Count -eq 0) {
+            throw "no external network interface with a default gateway was found"
+          }
+          New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -InterfaceAlias $externalInterfaces -RemoteAddress Internet | Out-Null
           $reachable = Test-NetConnection 1.1.1.1 -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue
           if ($reachable) { throw "outbound network remains reachable after applying the offline rule" }
+          $rule = Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE
+          $addressFilter = $rule | Get-NetFirewallAddressFilter
+          $interfaceFilter = $rule | Get-NetFirewallInterfaceFilter
+          Write-Output ("offline rule interfaces: " + ($interfaceFilter.InterfaceAlias -join ","))
+          Write-Output ("offline rule remote addresses: " + ($addressFilter.RemoteAddress -join ","))
 
       - name: Run offline native E2E
         shell: pwsh
         run: bun run test:tauri:e2e -- --preset dsh-runtime-native
+
+      - name: Capture native E2E diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Output "--- native E2E listeners ---"
+          Get-NetTCPConnection -State Listen -LocalPort 1420,4459 -ErrorAction SilentlyContinue |
+            Format-Table -AutoSize
+          Write-Output "--- native E2E processes ---"
+          Get-Process aiohub,msedgedriver,bun,node -ErrorAction SilentlyContinue |
+            Select-Object Id,ProcessName,Path |
+            Format-Table -AutoSize
+          Write-Output "--- offline firewall rule ---"
+          $rule = Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue
+          if ($rule) {
+            $rule | Get-NetFirewallAddressFilter | Format-List
+            $rule | Get-NetFirewallInterfaceFilter | Format-List
+          }
 
       - name: Restore outbound traffic
         if: always()

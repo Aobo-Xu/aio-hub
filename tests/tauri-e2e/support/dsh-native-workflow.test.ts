@@ -143,7 +143,7 @@ describe("dsh-runtime-native required workflow", () => {
     }
   });
 
-  it("denies outbound traffic during tests and always restores the firewall", () => {
+  it("denies external outbound traffic while preserving loopback and always restores the firewall", () => {
     const workflow = loadWorkflow();
     const e2eJob = workflow.jobs?.["native-e2e"];
     const steps = e2eJob?.steps ?? [];
@@ -154,7 +154,8 @@ describe("dsh-runtime-native required workflow", () => {
       (step) =>
         step.run?.includes("New-NetFirewallRule") &&
         step.run.includes("-Action Block") &&
-        step.run.includes("-RemoteAddress Internet")
+        step.run.includes("-RemoteAddress Internet") &&
+        step.run.includes("-InterfaceAlias $externalInterfaces")
     );
     const restoreIndex = steps.findIndex(
       (step) =>
