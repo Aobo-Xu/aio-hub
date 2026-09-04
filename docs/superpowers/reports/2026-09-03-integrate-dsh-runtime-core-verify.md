@@ -9,9 +9,9 @@
 
 ## 2026-09-04 runtime 基线与临时豁免修订
 
-DSH Windows runtime 已从旧的源码构建路线切换到 `v0.1.2-rc.1` 官方 `deepseek-harness-runtime-bin` wheel。插件稳定 lock 记录 tag/commit、PyPI 持久 URL、wheel SHA-256、两个 executable hash、上游 LICENSE/第三方声明和 SBOM；获取器先验 wheel 再动态发现版本化 metadata 目录。解析器、打包器、release verifier、Supervisor 和复用测试不包含 DSH 版本常量，未来版本 fixture 已证明无需重编译 Supervisor。插件验证提交为 `e8575534ccf7dfacfa86cda8bd3c0d4c40f70205`。
+DSH Windows runtime 已从旧的源码构建路线切换到 `v0.1.2-rc.1` 官方 `deepseek-harness-runtime-bin` wheel。插件稳定 lock 记录 tag/commit、PyPI 持久 URL、wheel SHA-256、两个 executable hash、上游 LICENSE/第三方声明和 SBOM；获取器先验 wheel 再动态发现版本化 metadata 目录。解析器、打包器、release verifier、Supervisor 和复用测试不包含 DSH 版本常量，未来版本 fixture 已证明无需重编译 Supervisor。插件验证提交为 `14c76483bcf7a7bdab9d4b59fb93e1ddad8b4bb0`。
 
-本地证据：官方 wheel 获取及逐文件校验通过；release ZIP 生成并由 verifier 返回零失败；供应链/安装定向 Vitest 13/13、Supervisor tests 44/44、插件 `bun run check` 全部通过。一次插件完整 Vitest 回归中，两个产物断言因运行前仍是旧 ZIP 而失败，重建 ZIP 后定向复验通过；另有既存 generated-contract 隔离测试超过其 5 秒上限，该超时与 runtime 变更无因果关系，未作为产品通过证据。
+本地证据：官方 wheel 获取及逐文件校验通过；release ZIP 生成并由 verifier 返回零失败；供应链/安装定向 Vitest 13/13、Supervisor tests 45/45、插件 `bun run check` 全部通过。一次插件完整 Vitest 回归中，两个产物断言因运行前仍是旧 ZIP 而失败，重建 ZIP 后定向复验通过；另有既存 generated-contract 隔离测试超过其 5 秒上限，该超时与 runtime 变更无因果关系，未作为产品通过证据。
 
 Windows workflow 新增严格分类器：只有 WebDriver 无法连接且没有任何测试结果产生时，才可在所有构建、打包、产物校验和 executable smoke 硬门禁通过后输出 `infrastructure-blocked`。该报告固定 `gatePassed=false`、`formalReleaseBlocked=true`；产品断言、IPC/Sidecar 或未知失败仍使 job 失败。临时豁免只允许 change 继续，不代表 E2E 通过，正式发布前仍必须取得 Windows native E2E 成功证据。
 
