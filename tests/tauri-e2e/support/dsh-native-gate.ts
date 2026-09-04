@@ -13,8 +13,6 @@ export type DshNativeGateResult = {
 
 const WEBDRIVER_UNREACHABLE =
   /Unable to connect to ["']http:\/\/(?:127\.0\.0\.1|localhost):\d+\/["'].*browser driver is running/is;
-const TEST_RESULT = /\b\d+\s+(?:passing|failing|passed|failed)\b/i;
-
 export function classifyDshNativeE2e(input: {
   exitCode: number;
   output: string;
@@ -29,10 +27,10 @@ export function classifyDshNativeE2e(input: {
       formalReleaseBlocked: false,
     };
   }
-  if (
-    WEBDRIVER_UNREACHABLE.test(input.output) &&
-    !TEST_RESULT.test(input.output)
-  ) {
+  // WDIO emits a "0 passed, 1 failed" spec summary even when it never
+  // creates a browser session. The connection error is the authoritative
+  // signal that no test body ran; inspect it before the summary line.
+  if (WEBDRIVER_UNREACHABLE.test(input.output)) {
     return {
       schemaVersion: 1,
       status: "infrastructure-blocked",

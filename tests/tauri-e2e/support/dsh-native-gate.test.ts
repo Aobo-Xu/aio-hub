@@ -20,6 +20,21 @@ describe("DSH native E2E temporary infrastructure waiver", () => {
     });
   });
 
+  it("recognizes WDIO's zero-spec summary as pre-test infrastructure failure", () => {
+    expect(
+      classifyDshNativeE2e({
+        exitCode: 1,
+        output:
+          'Unable to connect to "http://127.0.0.1:4459/", make sure browser driver is running on that address.\n\nSpec Files:\t 0 passed, 1 failed, 1 total',
+      }),
+    ).toMatchObject({
+      status: "infrastructure-blocked",
+      gatePassed: false,
+      temporaryWaiver: true,
+      formalReleaseBlocked: true,
+    });
+  });
+
   it("never waives a product test failure", () => {
     expect(
       classifyDshNativeE2e({
