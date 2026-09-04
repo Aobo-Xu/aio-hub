@@ -53,6 +53,9 @@ describe("dsh-runtime-native required workflow", () => {
     expect(workflow.on).toHaveProperty("pull_request");
     expect(workflow.on).toHaveProperty("push");
     expect(workflow.on).toHaveProperty("workflow_dispatch");
+    expect(workflow.on?.push).toMatchObject({
+      branches: expect.arrayContaining(["main", "dev", "codex/**"]),
+    });
   });
 
   it("keeps online preparation and offline execution in one required Windows job", () => {
