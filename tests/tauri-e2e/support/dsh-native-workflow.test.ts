@@ -108,6 +108,21 @@ describe("dsh-runtime-native required workflow", () => {
     );
   });
 
+  it("fetches DSH tag metadata while checking out the pinned source commit", () => {
+    const workflow = loadWorkflow();
+    const e2eJob = workflow.jobs?.["native-e2e"];
+    const checkout = (e2eJob?.steps ?? []).find(
+      (step) =>
+        step.uses?.startsWith("actions/checkout@") &&
+        step.with?.repository === "deepseek-ai/deepseek-harness"
+    );
+
+    expect(String(checkout?.with?.ref)).toBe(
+      "db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5"
+    );
+    expect(checkout?.with?.["fetch-depth"]).toBe(0);
+  });
+
   it("runs the production E2E with isolated AIO_E2E_* wiring", () => {
     const workflow = loadWorkflow();
     const e2eJob = workflow.jobs?.["native-e2e"];
