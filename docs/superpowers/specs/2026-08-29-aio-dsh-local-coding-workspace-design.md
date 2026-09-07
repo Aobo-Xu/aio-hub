@@ -2,6 +2,8 @@
 comet_change: integrate-dsh-runtime-core
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-07-integrate-dsh-runtime-core
+status: final
 ---
 
 # AIO 托管 DSH 本地 Coding工作站 Runtime Core 技术设计

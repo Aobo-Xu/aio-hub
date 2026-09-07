@@ -2,6 +2,7 @@
 change: integrate-dsh-runtime-core
 design-doc: docs/superpowers/specs/2026-08-29-aio-dsh-local-coding-workspace-design.md
 base-ref: 954857de201a2bd7abb8b88de6b7e6e3e8ea95b2
+archived-with: 2026-09-07-integrate-dsh-runtime-core
 ---
 
 # AIO 托管 DSH Runtime Core Implementation Plan
@@ -957,11 +958,11 @@ Assert the required lane has a separate online acquisition/build step, then uses
 
 Use `bun run build:vite` and `cargo build --manifest-path src-tauri/Cargo.toml` to provide `src-tauri/target/debug/aiohub.exe`. Before E2E, install a uniquely named outbound Windows Firewall deny rule for Internet traffic while preserving `127.0.0.1`; set telemetry disabled; always remove the rule in a `finally`/post step before upload. Only redacted reports, checksums and test results may be uploaded. PR executes ZIP contract plus executable smoke. Only a recognized WebDriver/port/runner failure before any test starts may be temporarily waived after all hard artifact gates pass; product/unknown failures remain fatal, the report must say E2E did not pass, and formal release requires a later successful native E2E.
 
-- [ ] **Step 3: Run focused workflow and native-lane checks**
+- [x] **Step 3: Run focused workflow and native-lane checks**
 
 Run: `bun run test:tauri:e2e -- --preset dsh-runtime-native` and the workflow's focused validation command.
 
-Expected: all non-loopback traffic is blocked during test execution; no user app-data, secrets, ZIP contents or runtime binary are uploaded. Success is recorded separately from `infrastructure-blocked`; a waiver never satisfies the formal release gate.
+Expected: all non-loopback traffic is blocked during test execution; no user app-data, secrets, ZIP contents or runtime binary are uploaded. Success is recorded separately from `infrastructure-blocked`; a waiver never satisfies the formal release gate. GitHub Actions run #10 (September 4, 2026) passed every hard build/package/checksum/smoke step and correctly recorded `WEBDRIVER_UNREACHABLE_BEFORE_TESTS` with `temporaryWaiver=true`, `gatePassed=false`, and `formalReleaseBlocked=true`; the native E2E itself did not pass.
 
 ### Task 16: 发布文档、兼容边界与全量门禁（OpenSpec 7.6）
 

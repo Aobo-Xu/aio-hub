@@ -1,0 +1,12 @@
+{
+  "openspec_proposal": "openspec/changes/integrate-dsh-runtime-core/proposal.md",
+  "openspec_design": "openspec/changes/integrate-dsh-runtime-core/design.md",
+  "openspec_tasks": "openspec/changes/integrate-dsh-runtime-core/tasks.md",
+  "openspec_delta_spec": "openspec/changes/integrate-dsh-runtime-core/specs/dsh-execution-bridge/spec.md",
+  "design_document": "docs/superpowers/specs/2026-08-29-aio-dsh-local-coding-workspace-design.md",
+  "build_plan": "docs/superpowers/plans/2026-08-30-aio-dsh-runtime-core.md",
+  "design_handoff": "openspec/changes/integrate-dsh-runtime-core/.comet/handoff/design-context.json",
+  "handoff_context": "openspec/changes/archive/2026-09-07-integrate-dsh-runtime-core/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/archive/2026-09-07-integrate-dsh-runtime-core/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-09-07-integrate-dsh-runtime-core"
+}
