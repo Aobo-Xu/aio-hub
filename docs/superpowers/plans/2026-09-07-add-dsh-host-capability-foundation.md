@@ -379,7 +379,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   提交信息：`feat: expose authoritative dsh sessions`
 
-### Task 9：实现真实 Snapshot、Event Pipeline、恢复与 Summary
+### Task 9：实现真实 Snapshot、Event Pipeline、恢复与 Summary ✅
 
 **文件：**
 - 重构：`packages/dsh-bridge/src/snapshot-recovery.ts`
@@ -395,7 +395,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 - 消费：Adapter projection port 与 Task 2 event envelope。
 - 产出：`SessionSnapshot`、`NormalizedHostEvent`、`ContextSummary`。
 
-- [ ] **Step 1：写拒绝占位 Snapshot 的 RED 测试**
+- [x] **Step 1：写拒绝占位 Snapshot 的 RED 测试**
 
   ```ts
   expect(snapshot.cursor).not.toBe("cursor-0");
@@ -405,19 +405,19 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   增加 gap、duplicate、generation change、slow consumer 和 summary budget/provenance 场景。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
   运行：`bunx vitest run packages/dsh-bridge/tests/snapshot-recovery.test.ts tests/contract/backpressure.test.ts tests/contract/recovery.test.ts`
 
-- [ ] **Step 3：实现真实投影与恢复**
+- [x] **Step 3：实现真实投影与恢复**
 
   Pipeline 顺序固定为 Adapter validate → normalize → mask → classify durability → bounded queue。Gap 后停止 delta，完成 snapshot-plus-cursor 才恢复。Summary 从权威事实构建，报告 omission/stale，不写回 session。
 
-- [ ] **Step 4：运行 GREEN 与确定性回放**
+- [x] **Step 4：运行 GREEN 与确定性回放**
 
   重复运行相同 event fixture，断言 snapshot/hash 一致；然后运行 Step 2 的测试命令并期望全部通过。
 
-- [ ] **Step 5：经授权后提交**
+- [x] **Step 5：经授权后提交**
 
   提交信息：`feat: recover dsh state from real snapshots`
 

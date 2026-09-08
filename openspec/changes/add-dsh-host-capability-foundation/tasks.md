@@ -38,11 +38,11 @@
 
 ## 6. 交付真实 Snapshot、事件恢复与有界 Summary
 
-- [ ] 6.1 用 DSH 派生的 durable facts、cursor、sequence、执行状态和活动 interaction 替换占位 snapshot，并核验 R8 测试拒绝 `cursor-0` 或合成空快照
-- [ ] 6.2 规范化带全部可用 workspace/session/Turn/step/tool/job/subagent identity 的有序事件 envelope，并核验两个 Adapter 的确定性去重和排序
-- [ ] 6.3 实现有界 ingress/egress queue、可丢弃 delta 合并与 overload 诊断，并通过慢消费者压力测试核验 durable start、终态和 interaction 不丢失
-- [ ] 6.4 实现通过 snapshot-plus-cursor 处理缺口与 generation 恢复，并核验 remount、reconnect 与 crash fixture 重建相同权威投影且不重放
-- [ ] 6.5 实现带 provenance、遗漏和 stale 元数据的脱敏、有界 workspace/session context summary，并核验生成 summary 不修改或占用 DSH 主会话上下文
+- [x] 6.1 用 DSH 派生的 durable facts、cursor、sequence、执行状态和活动 interaction 替换占位 snapshot，并核验 R8 测试拒绝 `cursor-0` 或合成空快照
+- [x] 6.2 规范化带全部可用 workspace/session/Turn/step/tool/job/subagent identity 的有序事件 envelope，并核验两个 Adapter 的确定性去重和排序
+- [x] 6.3 实现有界 ingress/egress queue、可丢弃 delta 合并与 overload 诊断，并通过慢消费者压力测试核验 durable start、终态和 interaction 不丢失
+- [x] 6.4 实现通过 snapshot-plus-cursor 处理缺口与 generation 恢复，并核验 remount、reconnect 与 crash fixture 重建相同权威投影且不重放
+- [x] 6.5 实现带 provenance、遗漏和 stale 元数据的脱敏、有界 workspace/session context summary，并核验生成 summary 不修改或占用 DSH 主会话上下文
 
 ## 7. 完成交互、附件、工件与终端
 
