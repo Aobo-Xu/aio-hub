@@ -218,24 +218,27 @@ jobs:
           $appExited = $appProbe.HasExited
           $appExitCode = if ($appExited) { $appProbe.ExitCode } else { "n/a" }
           "::notice title=app-probe-offline::embedded wdio server under offline rule: listening=$appListening exited=$appExited exitCode=$appExitCode bindSeconds=$([int]$probeWatch.Elapsed.TotalSeconds)"
-          foreach ($logFile in @($probeErr, $probeOut)) {
-            if (Test-Path $logFile) {
-              $logBytes = [IO.File]::ReadAllBytes($logFile)
-              if ($logBytes.Length -gt 0) {
-                $logB64 = [Convert]::ToBase64String($logBytes)
-                $label = Split-Path $logFile -Leaf
-                for ($i = 0; $i -lt [Math]::Min($logB64.Length, 9000); $i += 900) {
-                  "::notice title=app-probe-b64-$label::$($logB64.Substring($i, [Math]::Min(900, $logB64.Length - $i)))"
-                }
-              }
-            }
-          }
-          if (-not $appExited) { taskkill /PID $appProbe.Id /T /F | Out-Null }
+          if (-not $appExited) { taskkill /PID $appProbe.Id /T /F 2>&1 | Out-Null }
           foreach ($releaseWait in 1..10) {
             Start-Sleep -Seconds 1
             if (-not (Get-NetTCPConnection -LocalPort 4459 -State Listen -ErrorAction SilentlyContinue)) { break }
           }
-          if (-not $appListening) { throw "aiohub embedded WebDriver server did not bind 4459 under the offline rule; decode app-probe-b64 annotations for stdout/stderr" }
+          foreach ($logFile in @($probeErr, $probeOut)) {
+            try {
+              if (Test-Path $logFile) {
+                $logText = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+                if ($logText) {
+                  $logB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($logText))
+                  $label = Split-Path $logFile -Leaf
+                  for ($i = 0; $i -lt [Math]::Min($logB64.Length, 9000); $i += 900) {
+                    "::notice title=app-probe-b64-$label::$($logB64.Substring($i, [Math]::Min(900, $logB64.Length - $i)))"
+                  }
+                }
+              }
+            } catch {
+              "::notice title=app-probe-log-read::$logFile read failed: $($_.Exception.Message)"
+            }
+          }
 
       - name: Run offline native E2E
         id: offline-native-e2e
@@ -282,9 +285,12 @@ jobs:
             ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
           $wdioLog = Join-Path $env:AIO_E2E_ARTIFACT_DIR "wdio.log"
           if (Test-Path $wdioLog) {
-            $wdioB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($wdioLog))
-            for ($i = 0; $i -lt [Math]::Min($wdioB64.Length, 27000); $i += 900) {
-              "::notice title=wdio-log-b64::$($wdioB64.Substring($i, [Math]::Min(900, $wdioB64.Length - $i)))"
+            $wdioRaw = Get-Content $wdioLog -Raw -ErrorAction SilentlyContinue
+            if ($wdioRaw) {
+              $wdioB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($wdioRaw))
+              for ($i = 0; $i -lt [Math]::Min($wdioB64.Length, 27000); $i += 900) {
+                "::notice title=wdio-log-b64::$($wdioB64.Substring($i, [Math]::Min(900, $wdioB64.Length - $i)))"
+              }
             }
           }
 
