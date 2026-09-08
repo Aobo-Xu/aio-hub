@@ -168,12 +168,12 @@ jobs:
           # cancelled ~2.5 min after the blanket rule). The runner lifeline is
           # not part of the tested surface and stays unblocked.
           $blockedPrograms = New-Object System.Collections.Generic.List[string]
-          $blockedPrograms.Add($env:AIO_E2E_BINARY)
+          $blockedPrograms.Add([IO.Path]::GetFullPath($env:AIO_E2E_BINARY))
           $pluginBin = Join-Path ([IO.Path]::GetFullPath($env:AIO_E2E_DATA_DIR)) "plugins\dsh-coding-workspace\bin"
           $blockedPrograms.Add((Join-Path $pluginBin "win32-x64\aio-dsh-supervisor.exe"))
           $blockedPrograms.Add((Join-Path $pluginBin "deepseek-harness-sdk-runtime-win-x64.exe"))
           $blockedPrograms.Add((Join-Path $pluginBin "deepseek-harness-sdk-runtime-win-x64-rg.exe"))
-          $blockedPrograms.Add((Join-Path $env:AIO_E2E_EDGE_DRIVER_DIR "msedgedriver.exe"))
+          $blockedPrograms.Add((Join-Path ([IO.Path]::GetFullPath($env:AIO_E2E_EDGE_DRIVER_DIR)) "msedgedriver.exe"))
           Get-ChildItem "C:\Program Files (x86)\Microsoft\EdgeWebView\Application" -Directory -ErrorAction SilentlyContinue |
             ForEach-Object {
               $webviewExe = Join-Path $_.FullName "msedgewebview2.exe"
@@ -181,14 +181,40 @@ jobs:
             }
           foreach ($toolName in @("node", "bun")) {
             $toolCommand = Get-Command $toolName -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($toolCommand -and $toolCommand.Source) { $blockedPrograms.Add($toolCommand.Source) }
+            if ($toolCommand -and $toolCommand.Source) { $blockedPrograms.Add([IO.Path]::GetFullPath($toolCommand.Source)) }
           }
           $uniquePrograms = @($blockedPrograms | Sort-Object -Unique)
           if ($uniquePrograms.Count -lt 6) { throw "offline program list is unexpectedly small: $($uniquePrograms -join ', ')" }
+          $createdRules = 0
+          $placeholderRules = 0
+          $ruleFailures = @()
           foreach ($program in $uniquePrograms) {
-            New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -Program $program -RemoteAddress Internet | Out-Null
+            try {
+              New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -Program $program -RemoteAddress Internet -ErrorAction Stop | Out-Null
+              $createdRules++
+            } catch {
+              $firstError = $_.Exception.Message
+              if (-not (Test-Path $program)) {
+                try {
+                  New-Item -ItemType Directory -Path (Split-Path $program -Parent) -Force | Out-Null
+                  New-Item -ItemType File -Path $program -Force | Out-Null
+                  New-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -Direction Outbound -Action Block -Profile Any -Program $program -RemoteAddress Internet -ErrorAction Stop | Out-Null
+                  $createdRules++
+                  $placeholderRules++
+                  continue
+                } catch {
+                  $ruleFailures += "$program : placeholder retry failed: $($_.Exception.Message) (first: $firstError)"
+                  continue
+                }
+              }
+              $ruleFailures += "$program : $firstError"
+            }
           }
-          "::notice title=offline-programs::blocked programs ($($uniquePrograms.Count)): $($uniquePrograms -join ' | ')"
+          "::notice title=offline-programs::rules created $createdRules/$($uniquePrograms.Count) (placeholders: $placeholderRules); programs: $($uniquePrograms -join ' | ')"
+          if ($ruleFailures.Count -gt 0) {
+            foreach ($failure in $ruleFailures) { "::notice title=offline-rule-failure::$failure" }
+            throw "failed to create $($ruleFailures.Count) offline block rule(s); see offline-rule-failure annotations"
+          }
           $null = & node -e "fetch('https://1.1.1.1/', { signal: AbortSignal.timeout(8000) }).then(() => process.exit(0), () => process.exit(1))" 2>$null
           if ($LASTEXITCODE -eq 0) { throw "outbound network remains reachable for blocked programs after applying offline rules" }
           $offlineRuleCount = @(Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE).Count
