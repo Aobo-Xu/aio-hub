@@ -143,6 +143,43 @@ jobs:
           "::notice title=driver-probe::standalone msedgedriver on 4459 listening=$listening exited=$probeExited exitCode=$probeExitCode"
           if (-not $listening) { throw "msedgedriver cannot listen on 127.0.0.1:4459 standalone (exited=$probeExited exitCode=$probeExitCode)" }
 
+      - name: Probe embedded WebDriver server on the app binary
+        shell: pwsh
+        run: |
+          $env:WDIO_EMBEDDED_SERVER = "true"
+          $env:TAURI_WEBDRIVER_PORT = "4459"
+          $env:AIO_DATA_DIR = "$env:RUNNER_TEMP\app-probe-data"
+          $env:AIO_ID_SUFFIX = "app-probe"
+          $env:PATH = "$env:AIO_E2E_EDGE_DRIVER_DIR;$env:PATH"
+          $probeOut = "$env:RUNNER_TEMP\app-probe.out.log"
+          $probeErr = "$env:RUNNER_TEMP\app-probe.err.log"
+          $appProbe = Start-Process $env:AIO_E2E_BINARY -PassThru -WindowStyle Hidden -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr
+          $appListening = $false
+          foreach ($attempt in 1..12) {
+            Start-Sleep -Seconds 5
+            if ($appProbe.HasExited) { break }
+            $appListening = Test-NetConnection 127.0.0.1 -Port 4459 -InformationLevel Quiet -WarningAction SilentlyContinue
+            if ($appListening) { break }
+          }
+          $appExited = $appProbe.HasExited
+          $appExitCode = if ($appExited) { $appProbe.ExitCode } else { "n/a" }
+          "::notice title=app-probe::embedded wdio server listen on 4459: $appListening exited=$appExited exitCode=$appExitCode"
+          foreach ($logFile in @($probeErr, $probeOut)) {
+            if (Test-Path $logFile) {
+              $logText = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+              if ($logText) {
+                $logText = $logText -replace "`r?`n", " ~ "
+                $label = Split-Path $logFile -Leaf
+                for ($i = 0; $i -lt [Math]::Min($logText.Length, 5400); $i += 900) {
+                  "::notice title=app-probe-$label::$($logText.Substring($i, [Math]::Min(900, $logText.Length - $i)))"
+                }
+              }
+            }
+          }
+          if (-not $appExited) { taskkill /PID $appProbe.Id /T /F | Out-Null }
+          Start-Sleep -Seconds 2
+          if (-not $appListening) { throw "aiohub embedded WebDriver server did not bind 4459 standalone; see app-probe annotations for stderr" }
+
       - name: Generate one-run crash injection token
         shell: pwsh
         run: |
@@ -236,11 +273,13 @@ jobs:
           }
           Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Recurse -File -ErrorAction SilentlyContinue |
             ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
-          Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Recurse -File -Filter "*.log" -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              $artifactLogTail = Get-Content $_.FullName -Tail 20 -ErrorAction SilentlyContinue
-              "::notice title=artifact-log::$($_.Name): $(($artifactLogTail -join ' ~ '))"
+          $wdioLog = Join-Path $env:AIO_E2E_ARTIFACT_DIR "wdio.log"
+          if (Test-Path $wdioLog) {
+            $wdioText = (Get-Content $wdioLog -Raw) -replace "`r?`n", " ~ "
+            for ($i = 0; $i -lt [Math]::Min($wdioText.Length, 7200); $i += 900) {
+              "::notice title=wdio-log::$($wdioText.Substring($i, [Math]::Min(900, $wdioText.Length - $i)))"
             }
+          }
 
       - name: Classify native E2E result
         if: always()
