@@ -217,6 +217,8 @@ jobs:
           }
           $null = & node -e "fetch('https://1.1.1.1/', { signal: AbortSignal.timeout(8000) }).then(() => process.exit(0), () => process.exit(1))" 2>$null
           if ($LASTEXITCODE -eq 0) { throw "outbound network remains reachable for blocked programs after applying offline rules" }
+          if ($LASTEXITCODE -ne 1) { throw "offline reachability probe inconclusive: node exit code $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
           $offlineRuleCount = @(Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE).Count
           Write-Output ("offline rules created: " + $offlineRuleCount)
           $offlineProbe = Start-Process "$env:AIO_E2E_EDGE_DRIVER_DIR\msedgedriver.exe" -ArgumentList "--port=4459" -PassThru -WindowStyle Hidden
