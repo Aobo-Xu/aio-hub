@@ -1,1 +1,0 @@
-[WDIO] Failed to set global logger (may be already set by another plugin): attempted to set a logger after the logging system was already initialized
