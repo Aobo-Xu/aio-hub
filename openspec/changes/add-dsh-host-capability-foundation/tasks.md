@@ -26,7 +26,7 @@
 - [x] 4.1 为每个 Supervisor execution domain 启动一个可承载多个 workspace/session 的长期 DSH Host；核验 readiness 等待 Cordis settlement，且全部后代进程受 Windows Job Object 清理
 - [x] 4.2 创建并保护隔离的 Managed DSH Home/Profile；核验权限、凭据原子处理和清理流程均不触碰用户默认 DSH Home
 - [x] 4.3 扩展 upgrading、recovering、maintenance 与 incompatible 生命周期状态；通过聚焦状态机测试核验合法转换、mutation fencing 和脱敏诊断
-- [ ] 4.4 实现官方 DSH flush/dispose 与崩溃恢复；核验活动 Turn/handle 变为 interrupted、持久事实被重建，且 Prompt 或副作用绝不重放
+- [x] 4.4 实现官方 DSH flush/dispose 与崩溃恢复；核验活动 Turn/handle 变为 interrupted、持久事实被重建，且 Prompt 或副作用绝不重放
 
 ## 5. 交付权威 Workspace 与 Session 控制面
 
@@ -51,7 +51,7 @@
 - [x] 7.3 为 message、reasoning、tool、job、workflow、context、file、diff、terminal 与 subagent 规范化 presenter 元数据，并核验未知 kind 使用脱敏通用记录且不暴露不安全操作
 - [x] 7.4 实现权威 file/Diff snapshot provenance 和独立 capability-gated 操作；核验只读 Diff 可审阅，而缺失的 apply/revert/open 操作 fail closed
 - [x] 7.5 通过官方 seam 实现 terminal handle 的 start/input/resize/interrupt/close 与进程清理；核验 generation 停止后 handle 不可写、后代被回收且命令不重放
-- [ ] 7.6 投影 DSH 自有的 job、workflow 与 subagent identity、父子关系、进度和控制；核验 Host 不建立平行 AIO 所有权，也不从展示文本推断控制能力
+- [x] 7.6 投影 DSH 自有的 job、workflow 与 subagent identity、父子关系、进度和控制；核验 Host 不建立平行 AIO 所有权，也不从展示文本推断控制能力
 
 ## 8. 完成模型、Preset 与创造模式 Host 能力
 
