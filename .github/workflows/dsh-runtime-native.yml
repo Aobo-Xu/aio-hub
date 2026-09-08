@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Aobo-Xu/aiohub-plugin-dsh-workspace
-          ref: 14c76483bcf7a7bdab9d4b59fb93e1ddad8b4bb0
+          ref: 5f9af2dd31994016220fc091d5eed6bf14260cd1
           path: plugin
 
       - name: Set up Bun
