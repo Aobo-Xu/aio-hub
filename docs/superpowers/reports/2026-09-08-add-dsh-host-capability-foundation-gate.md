@@ -97,6 +97,22 @@ GitHub Actions 最新可见结果仍为 2026-09-04 的 DSH Runtime Native E2E #5
 
 OpenSpec 10.3c 已据此勾选（**50/51**）。10.5 仍未勾选：按既定策略本机 lane 不替代 GitHub 离线 CI 门禁；推送 `aobo-validation` 重跑 CI 待用户授权。`formalReleaseBlocked=true` 保持至 CI 门禁取得结果；本机 E2E 已真实通过，故对本机 lane 不再适用临时基础设施豁免表述。
 
+## 增补二：GitHub 离线 CI 门禁通过与执行模型偏差（2026-09-09）
+
+获得授权后（仅推送 `Aobo-Xu` 名下仓库），插件分支 `codex/add-dsh-host-capability-foundation`（`5f9af2dd`）推送至插件仓 origin，AIO 验证分支（dev lineage，含 spec/tasks/报告同步与插件 pin 更新）推送至 `aobo-validation`。经 run #1–#12 的诊断-修复迭代，**run 34280645166（head `17eb15cb1`）离线门禁真实通过**：`dsh-runtime-native` preset 8/8（31.1s），分类器输出 `status=passed、gatePassed=true、temporaryWaiver=false、reasonCode=E2E_PASSED、formalReleaseBlocked=false`，全部步骤绿、无豁免注释。10.5 据此勾选，OpenSpec **51/51**。
+
+诊断链定位并修复了五层独立故障（均有 run 级证据，详见各 ci: 提交与 `ci-diagnostics/dsh-native` 分支诊断包）：
+
+1. **capability 映射缺陷**（产品侧，本轮唯一代码缺陷）：supervisor 将 camelCase wire kind 泄漏进 capability gate → kebab 显式映射修复（插件 `5f9af2dd`）；
+2. **runner 上 tauri-service launcher 侧 onPrepare 静默不拉起应用**（run #8：wdio.log 去 null 后无任何 onPrepare 日志、无 backend 捕获文件、worker 0.5s 内连死端口）→ 改为 workflow 预启动拓扑：vite preview + 应用以 service 等价环境先行拉起，worker 按既有语义连接 existing driver（run.ts 本身支持复用既有前端与端口；应用带 single-instance 插件，双拉起安全）；
+3. **runner 步骤末进程树回收**（run #9：Start-Process 预启动的健康 ready 实例活不过步骤边界）→ WMI `Win32_Process Create` 脱离 runner 进程树；
+4. **接口级离线阻断切断 runner 生命线**（run #10：lane 健康执行、resident 已返回 27 capabilities ready，约 2.5 分钟后作业被平台取消；Windows 防火墙 block 优先于 allow，救生名单不可行）→ 离线执行模型收敛为**被测面程序级封禁**；
+5. **pwsh 退出码/路径细节**（run #11 混合分隔符路径建规失败 → GetFullPath 归一；run #12 被封禁 node 的预期退出码 1 泄漏为步骤退出码 → 三态判定+复位）。
+
+**执行模型偏差记录**：相对早期「接口级全阻断」（commit `808bde9a5`），现行为被测面程序级封禁——aiohub.exe、msedgewebview2.exe（全版本枚举）、插件 supervisor/runtime/rg（路径由数据目录确定，规则先于安装生效）、msedgedriver.exe、node.exe、bun.exe 对外联（RemoteAddress Internet）全部阻断，并以被封禁 node 的实际 fetch 验证阻断生效；runner 生命线进程不在被测面内，保持连通。「被测运行时全程无外联」的门禁语义不变，偏差由平台硬约束（block 优先 + runner 断联即取消）强制。
+
+发布状态更新：Host Gate v3 21/21（既有）；Windows native E2E GitHub 离线门禁 **passed（非豁免）**；`temporaryWaiver=false`；Coding Workstation UI 阻塞已按 Host Gate v3 解除；本 change 进入 Comet Verify/归档阶段。
+
 ## 发布状态
 
 - Host 契约/实现门禁：**21/21 pass**；
