@@ -421,7 +421,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   提交信息：`feat: recover dsh state from real snapshots`
 
-### Task 10：完成 Interaction、Attachment、Artifact 与 Presenter
+### Task 10：完成 Interaction、Attachment、Artifact 与 Presenter ✅
 
 **文件：**
 - 重构：`packages/dsh-bridge/src/interactions.ts`
@@ -437,27 +437,27 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 - 消费：Adapter interaction/artifact port、availability、ledger。
 - 产出：exactly-once interaction、hashed staging、file/diff provenance、masked presenter record。
 
-- [ ] **Step 1：写 RED 场景**
+- [x] **Step 1：写 RED 场景**
 
   覆盖 approval/question resolve-once、迟到响应、attachment count/type/size、取消清理、Diff review-only、unknown presenter 和秘密/path masking。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
   运行：`bunx vitest run packages/dsh-bridge/tests/interactions-artifacts.test.ts tests/contract/interaction.test.ts`
 
-- [ ] **Step 3：实现交互与工件边界**
+- [x] **Step 3：实现交互与工件边界**
 
   `interactionId` 绑定 generation/session/Turn/lease/upstream handle。Attachment 复制到受管 staging 后计算 SHA-256。Presenter actions 完全来自 operation availability；mask 在事件出 Host 前执行。
 
-- [ ] **Step 4：运行 GREEN**
+- [x] **Step 4：运行 GREEN**
 
   运行 Step 2 命令，另检查失败日志不包含测试 secret 或完整用户路径。
 
-- [ ] **Step 5：经授权后提交**
+- [x] **Step 5：经授权后提交**
 
   提交信息：`feat: bridge dsh interactions and artifacts`
 
-### Task 11：完成 Terminal、执行投影、Model/Preset 与 Creative Host-half
+### Task 11：完成 Terminal、执行投影、Model/Preset 与 Creative Host-half ✅
 
 **文件：**
 - 创建：`packages/dsh-bridge/src/terminals/terminal-service.ts`
@@ -471,23 +471,23 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 - 消费：Adapter terminal/preset/dynamic ports。
 - 产出：官方 terminal handle lifecycle、job/workflow/subagent presenter、immutable Turn config、Host-half dynamic package lifecycle。
 
-- [ ] **Step 1：写 RED 测试**
+- [x] **Step 1：写 RED 测试**
 
   覆盖 terminal start/input/resize/interrupt/close、generation 后不可写与进程清理；model/service/source/preset 历史 provenance；minimal/standard/PTC roster；creative explicit-confirmation；崩溃后 dynamic package inactive；browser half unavailable。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
   运行：`bunx vitest run packages/dsh-bridge/tests/terminal-preset-dynamic.test.ts packages/dsh-bridge/tests/turn-snapshot.test.ts`
 
-- [ ] **Step 3：实现稳定服务**
+- [x] **Step 3：实现稳定服务**
 
   Terminal identity 只使用官方 handle，不依赖 pid。Turn snapshot 冻结完整配置，persona prefix/suffix 只通过 Adapter 官方 seam 组装。Dynamic package 按 Agent/session/generation 隔离，恢复时不重建。Browser half 始终 fail closed。
 
-- [ ] **Step 4：运行 GREEN**
+- [x] **Step 4：运行 GREEN**
 
   运行 Step 2 命令，并用 alpha.2 fixture 断言 queued subagent actions 与 PTC command/output 保持结构化。
 
-- [ ] **Step 5：经授权后提交**
+- [x] **Step 5：经授权后提交**
 
   提交信息：`feat: expose dsh terminals presets and creative host`
 

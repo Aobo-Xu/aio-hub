@@ -46,20 +46,20 @@
 
 ## 7. 完成交互、附件、工件与终端
 
-- [ ] 7.1 通过当前 lease 接通 approval 与 user-question 的请求/收敛及 exactly-once correlation；核验重复、迟到、撤回、超时和 generation 过期响应均不影响 DSH
-- [ ] 7.2 实现附件限制广告及 Host 自有的 hash staging/cleanup；核验无效类型、数量和大小在提交 Prompt 前失败，且用户源文件不被修改
-- [ ] 7.3 为 message、reasoning、tool、job、workflow、context、file、diff、terminal 与 subagent 规范化 presenter 元数据，并核验未知 kind 使用脱敏通用记录且不暴露不安全操作
-- [ ] 7.4 实现权威 file/Diff snapshot provenance 和独立 capability-gated 操作；核验只读 Diff 可审阅，而缺失的 apply/revert/open 操作 fail closed
-- [ ] 7.5 通过官方 seam 实现 terminal handle 的 start/input/resize/interrupt/close 与进程清理；核验 generation 停止后 handle 不可写、后代被回收且命令不重放
+- [x] 7.1 通过当前 lease 接通 approval 与 user-question 的请求/收敛及 exactly-once correlation；核验重复、迟到、撤回、超时和 generation 过期响应均不影响 DSH
+- [x] 7.2 实现附件限制广告及 Host 自有的 hash staging/cleanup；核验无效类型、数量和大小在提交 Prompt 前失败，且用户源文件不被修改
+- [x] 7.3 为 message、reasoning、tool、job、workflow、context、file、diff、terminal 与 subagent 规范化 presenter 元数据，并核验未知 kind 使用脱敏通用记录且不暴露不安全操作
+- [x] 7.4 实现权威 file/Diff snapshot provenance 和独立 capability-gated 操作；核验只读 Diff 可审阅，而缺失的 apply/revert/open 操作 fail closed
+- [x] 7.5 通过官方 seam 实现 terminal handle 的 start/input/resize/interrupt/close 与进程清理；核验 generation 停止后 handle 不可写、后代被回收且命令不重放
 - [ ] 7.6 投影 DSH 自有的 job、workflow 与 subagent identity、父子关系、进度和控制；核验 Host 不建立平行 AIO 所有权，也不从展示文本推断控制能力
 
 ## 8. 完成模型、Preset 与创造模式 Host 能力
 
-- [ ] 8.1 暴露 model/service/source/preset catalog provenance 与不可变 Turn 配置快照，并核验历史 Turn 在设置变化后仍保留执行时取值
-- [ ] 8.2 保持 AIO LLM Profile 为默认入口，同时隔离 DSH 特有设置与显式兼容的 DSH-native Profile；核验不引入启发式 provider fallback 或重复的 AIO 设置 UI 契约
-- [ ] 8.3 通过能力发现 minimal、standard、PTC 和未来 preset 及其 generation/switch scope 元数据，并核验切换仅依 DSH 语义影响允许的 session 或后续 Turn
-- [ ] 8.4 实现需显式确认、按 Agent/session/generation 隔离的 Host-half 动态包 define/run/update/stop/undefine/inventory/diagnostics，并核验崩溃恢复后临时包保持 inactive 且不重放
-- [ ] 8.5 独立强制 browser-half fail closed，并核验浏览器包返回结构化 unavailable，不向 AIO 加载代码且不影响 Host-half 稳定性
+- [x] 8.1 暴露 model/service/source/preset catalog provenance 与不可变 Turn 配置快照，并核验历史 Turn 在设置变化后仍保留执行时取值
+- [x] 8.2 保持 AIO LLM Profile 为默认入口，同时隔离 DSH 特有设置与显式兼容的 DSH-native Profile；核验不引入启发式 provider fallback 或重复的 AIO 设置 UI 契约
+- [x] 8.3 通过能力发现 minimal、standard、PTC 和未来 preset 及其 generation/switch scope 元数据，并核验切换仅依 DSH 语义影响允许的 session 或后续 Turn
+- [x] 8.4 实现需显式确认、按 Agent/session/generation 隔离的 Host-half 动态包 define/run/update/stop/undefine/inventory/diagnostics，并核验崩溃恢复后临时包保持 inactive 且不重放
+- [x] 8.5 独立强制 browser-half fail closed，并核验浏览器包返回结构化 unavailable，不向 AIO 加载代码且不影响 Host-half 稳定性
 
 ## 9. 增加面向后续 change 的扩展缝
 
