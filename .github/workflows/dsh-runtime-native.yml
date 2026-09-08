@@ -26,6 +26,7 @@ jobs:
       AIO_E2E_EDGE_DRIVER_DIR: ${{ github.workspace }}/.e2e-driver
       AIO_E2E_FIREWALL_RULE: AIO-DSH-E2E-OFFLINE-${{ github.run_id }}-${{ github.run_attempt }}
       AIO_E2E_WDIO_LOG_LEVEL: debug
+      AIO_E2E_MOCK_PORT: "4480"
     steps:
       - name: Check out AIO repository
         uses: actions/checkout@v4
@@ -240,6 +241,56 @@ jobs:
             }
           }
 
+      - name: Pre-start frontend and app for the embedded lane
+        shell: pwsh
+        run: |
+          # The launcher-side service spawn silently no-ops on this runner
+          # (ci-diagnostics bundle, run 34270895688: no onPrepare logs, no
+          # captured backend log, worker connects to a never-started port).
+          # run.ts reuses an already-serving frontend on 1420, the worker
+          # connects to an already-listening embedded server on 4459, and the
+          # app has the single-instance plugin, so pre-starting both here is
+          # equivalent to the service-spawned topology.
+          $viteOut = "$env:RUNNER_TEMP\vite-prestart.out.log"
+          $viteErr = "$env:RUNNER_TEMP\vite-prestart.err.log"
+          $viteProc = Start-Process node -ArgumentList "node_modules/vite/bin/vite.js","preview","--host","127.0.0.1","--port","1420","--strictPort" -PassThru -WindowStyle Hidden -RedirectStandardOutput $viteOut -RedirectStandardError $viteErr
+          $frontendUp = $false
+          foreach ($wait in 1..30) {
+            Start-Sleep -Seconds 1
+            try { $null = Invoke-WebRequest "http://127.0.0.1:1420/" -UseBasicParsing -TimeoutSec 2; $frontendUp = $true; break } catch {}
+          }
+          "::notice title=prestart-frontend::vite preview on 1420: $frontendUp (pid $($viteProc.Id))"
+          if (-not $frontendUp) { throw "pre-started vite preview did not serve 1420; see vite-prestart logs" }
+          $env:WDIO_EMBEDDED_SERVER = "true"
+          $env:TAURI_WEBDRIVER_PORT = "4459"
+          $env:AIO_ID_SUFFIX = $env:AIO_E2E_ID_SUFFIX
+          $env:AIO_DATA_DIR = [IO.Path]::GetFullPath($env:AIO_E2E_DATA_DIR)
+          $env:AIO_E2E_MOCK_BASE_URL = "http://127.0.0.1:$env:AIO_E2E_MOCK_PORT"
+          $env:PATH = "$env:AIO_E2E_EDGE_DRIVER_DIR;$env:PATH"
+          $appOut = "$env:RUNNER_TEMP\lane-app.out.log"
+          $appErr = "$env:RUNNER_TEMP\lane-app.err.log"
+          $laneApp = Start-Process $env:AIO_E2E_BINARY -PassThru -WindowStyle Hidden -RedirectStandardOutput $appOut -RedirectStandardError $appErr
+          $appReady = $false
+          foreach ($wait in 1..24) {
+            Start-Sleep -Seconds 5
+            if ($laneApp.HasExited) { break }
+            try { $status = Invoke-WebRequest "http://127.0.0.1:4459/status" -UseBasicParsing -TimeoutSec 3; if ($status.StatusCode -eq 200 -and $status.Content -match '"ready"\s*:\s*true') { $appReady = $true; break } } catch {}
+          }
+          if ($appReady) { Start-Sleep -Seconds 15 }
+          $appExited = $laneApp.HasExited
+          "::notice title=prestart-app::embedded server ready on 4459: $appReady exited=$appExited (pid $($laneApp.Id))"
+          "$($laneApp.Id)" | Set-Content "$env:RUNNER_TEMP\lane-app.pid"
+          "$($viteProc.Id)" | Set-Content "$env:RUNNER_TEMP\prestart-vite.pid"
+          if (-not $appReady) {
+            foreach ($logFile in @($appErr, $appOut)) {
+              if (Test-Path $logFile) {
+                $logText = (Get-Content $logFile -Raw -ErrorAction SilentlyContinue) -replace "`r?`n", " ~ "
+                "::notice title=prestart-app-log::$(Split-Path $logFile -Leaf): $logText"
+              }
+            }
+            throw "pre-started app did not serve the embedded WebDriver server on 4459"
+          }
+
       - name: Run offline native E2E
         id: offline-native-e2e
         shell: pwsh
@@ -258,6 +309,12 @@ jobs:
         if: always()
         shell: pwsh
         run: |
+          foreach ($pidFile in @("$env:RUNNER_TEMP\lane-app.pid", "$env:RUNNER_TEMP\prestart-vite.pid")) {
+            if (Test-Path $pidFile) {
+              $recordedPid = Get-Content $pidFile -ErrorAction SilentlyContinue
+              if ($recordedPid) { taskkill /PID $recordedPid /T /F 2>&1 | Out-Null }
+            }
+          }
           Write-Output "--- native E2E listeners ---"
           Get-NetTCPConnection -State Listen -LocalPort 1420,4459 -ErrorAction SilentlyContinue |
             Format-Table -AutoSize
@@ -346,7 +403,7 @@ jobs:
           if ($env:AIO_DSH_E2E_LOG -and (Test-Path $env:AIO_DSH_E2E_LOG)) {
             Copy-Item $env:AIO_DSH_E2E_LOG (Join-Path $bundle "lane-stdout.log") -Force
           }
-          foreach ($probeLog in @("app-probe.out.log", "app-probe.err.log")) {
+          foreach ($probeLog in @("app-probe.out.log", "app-probe.err.log", "lane-app.out.log", "lane-app.err.log", "vite-prestart.out.log", "vite-prestart.err.log")) {
             $probePath = Join-Path $env:RUNNER_TEMP $probeLog
             if (Test-Path $probePath) { Copy-Item $probePath $bundle -Force }
           }
