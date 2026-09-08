@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "gatePassed": true,
+  "temporaryWaiver": false,
+  "reasonCode": "E2E_PASSED",
+  "formalReleaseBlocked": false
+}

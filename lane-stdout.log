@@ -1,0 +1,28 @@
+$ bun scripts/e2e.ts tauri --preset dsh-runtime-native
+
+Execution of 1 workers started at 2026-09-08T21:38:20.301Z
+
+[0-0] RUNNING in undefined - file:///D:/a/aio-hub/aio-hub/tests/tauri-e2e/specs/dsh-plugin-release.spec.ts
+[0-0] PASSED in undefined - file:///D:/a/aio-hub/aio-hub/tests/tauri-e2e/specs/dsh-plugin-release.spec.ts
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[webview unknown windows #0-0] Running: webview (vunknown) on windows
+[webview unknown windows #0-0] Session ID: 73d1ae20-d07b-4899-bca8-5e3083d4ce91
+[webview unknown windows #0-0]
+[webview unknown windows #0-0] » tests\tauri-e2e\specs\dsh-plugin-release.spec.ts
+[webview unknown windows #0-0] DSH release plugin
+[webview unknown windows #0-0]    ✓ installs the final ZIP through production IPC and reaches resident ready
+[webview unknown windows #0-0]    ✓ runs a coding turn through the resident session channel
+[webview unknown windows #0-0]    ✓ flushes a graceful shutdown and removes the resident process tree
+[webview unknown windows #0-0]    ✓ records crash interruption and never replays the interrupted turn
+[webview unknown windows #0-0]    ✓ restarts the resident sidecar and resumes readiness
+[webview unknown windows #0-0]    ✓ rejects a candidate whose runtime handshake fails and restores the last good runtime
+[webview unknown windows #0-0]    ✓ commits a verified staged upgrade and preserves plugin data
+[webview unknown windows #0-0]    ✓ uninstalls cleanly and preserves plugin data
+[webview unknown windows #0-0]
+[webview unknown windows #0-0] 8 passing (31.1s)
+
+
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:33  
+
