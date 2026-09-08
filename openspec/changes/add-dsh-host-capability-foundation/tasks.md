@@ -69,8 +69,8 @@
 
 ## 10. 集成、门禁与报告同步
 
-- [ ] 10.1 运行聚焦的协议生成、TypeScript typecheck/build、Rust 测试和两个真实发行版 Adapter 契约套件；记录准确命令与结果，不重复无关完整测试
-- [ ] 10.2 构建 release-shaped Windows 插件 ZIP，运行 manifest-selected checksum、license/SBOM、runtime closure、release verifier 与 executable smoke；核验 manifest 不依赖 Cargo target cache 或本机 DSH 源码目录
+- [x] 10.1 运行聚焦的协议生成、TypeScript typecheck/build、Rust 测试和两个真实发行版 Adapter 契约套件；记录准确命令与结果，不重复无关完整测试
+- [x] 10.2 构建 release-shaped Windows 插件 ZIP，运行 manifest-selected checksum、license/SBOM、runtime closure、release verifier 与 executable smoke；核验 manifest 不依赖 Cargo target cache 或本机 DSH 源码目录
 - [ ] 10.3 通过生产 AIO 插件安装与 resident Sidecar IPC 运行集成测试；使用隔离 app-data 核验真实 workspace/session、snapshot 恢复、interaction、cancel、进程树清理、升级/回退 hook、卸载与数据保留
 - [ ] 10.4 重跑 Coding Workstation Host Gate；仅当 R1–R17、R19–R20 全部通过、R18 明确 fail closed、R8 包含真实 DSH facts 时更新门禁报告为通过
 - [ ] 10.5 在已记录的离线策略下仅运行一次 Windows native E2E 里程碑；只有 build/package/artifact/smoke 成功后的受控 pre-test 基础设施故障可临时豁免，并必须保持 `gatePassed=false`、`formalReleaseBlocked=true`，不得写成产品 E2E 通过

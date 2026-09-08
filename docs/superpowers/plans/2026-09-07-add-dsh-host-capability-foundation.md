@@ -551,13 +551,13 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 - 消费：Tasks 1–12 的生产 RuntimeFacade、Supervisor、Host 和双 Adapter。
 - 产出：release-shaped ZIP、生产 IPC 证据、更新后的 Host Gate 与发布阻塞状态。
 
-- [ ] **Step 1：先运行插件聚焦完整检查**
+- [x] **Step 1：先运行插件聚焦完整检查**
 
   运行：`bun run check && bun run test && bun run build`
 
   期望：TypeScript、generated drift、Rust fmt/clippy/test 和 runtime verifier 全部通过。失败时只进入对应根因组修复，不重复其他已通过命令。
 
-- [ ] **Step 2：构建并验证最终 Windows ZIP**
+- [x] **Step 2：构建并验证最终 Windows ZIP**
 
   运行：`bun run package:platform`，随后对 manifest-selected `bin/win32-x64/aio-dsh-supervisor.exe` 运行 initialize/shutdown smoke，并运行 `scripts/verify-release.ts`。
 
