@@ -18,8 +18,8 @@
 - [x] 3.1 定义覆盖 lifecycle、workspace、session、history、snapshot、interaction、artifact、terminal、preset 和动态 Host 操作的内部 DSH Adapter seam，并核验通用 Host 模块没有发行版分支或 DSH 私有导入
 - [x] 3.2 使用官方 Session Controller、Typert Remote、SessionPersistence、Cordis 及相关公共服务实现 `v0.1.2-rc.1` Adapter，并核验其真实 runtime 聚焦契约套件通过
 - [x] 3.3 针对 persistence/wire、persona 前后缀、队列/子代理状态、PTC 输出和普通 subprocess handle 无 pid 等差异实现 `v0.1.3-alpha.2` 兼容 Adapter，并通过同一稳定契约套件和官方源码 fixture 核验；因无官方 wheel，Windows SDK 启动/进程清理记为待补验证且不阻断当前实现
-- [ ] 3.4 按协商证据而非语义版本猜测选择 Adapter，并核验不完整或未知发行版进入结构化 `incompatible` 或权威只读状态
-- [ ] 3.5 增加 import/storage guard，禁止 DSH 私有 registry、复制 Web BFF 及解析或修改 JSONL，并核验生产 bundle 与源码审计通过
+- [x] 3.4 按协商证据而非语义版本猜测选择 Adapter，并核验不完整或未知发行版进入结构化 `incompatible` 或权威只读状态
+- [x] 3.5 增加 import/storage guard，禁止 DSH 私有 registry、复制 Web BFF 及解析或修改 JSONL，并核验生产 bundle 与源码审计通过
 
 ## 4. 用长期驻留 Managed Host 替换 loopback 执行
 
