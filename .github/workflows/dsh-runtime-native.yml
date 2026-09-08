@@ -8,7 +8,7 @@ on:
     branches: [main, dev, "codex/**"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   native-e2e:
@@ -331,6 +331,45 @@ jobs:
             Remove-NetFirewallRule
           ipconfig /flushdns | Out-Null
           Start-Sleep -Seconds 5
+
+      - name: Publish diagnostics bundle to ci-diagnostics branch
+        if: always()
+        shell: pwsh
+        env:
+          DIAG_BRANCH: ci-diagnostics/dsh-native
+        run: |
+          $bundle = Join-Path $env:RUNNER_TEMP "diag-bundle"
+          New-Item -ItemType Directory -Force $bundle | Out-Null
+          if ($env:AIO_E2E_ARTIFACT_DIR -and (Test-Path $env:AIO_E2E_ARTIFACT_DIR)) {
+            Copy-Item "$env:AIO_E2E_ARTIFACT_DIR\*" $bundle -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          if ($env:AIO_DSH_E2E_LOG -and (Test-Path $env:AIO_DSH_E2E_LOG)) {
+            Copy-Item $env:AIO_DSH_E2E_LOG (Join-Path $bundle "lane-stdout.log") -Force
+          }
+          foreach ($probeLog in @("app-probe.out.log", "app-probe.err.log")) {
+            $probePath = Join-Path $env:RUNNER_TEMP $probeLog
+            if (Test-Path $probePath) { Copy-Item $probePath $bundle -Force }
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          $env:GIT_INDEX_FILE = Join-Path $env:RUNNER_TEMP "diag-index"
+          try {
+            git read-tree --empty 2>$null | Out-Null
+            $bundleRoot = (Resolve-Path $bundle).Path
+            Get-ChildItem $bundle -Recurse -File | ForEach-Object {
+              $rel = $_.FullName.Substring($bundleRoot.Length + 1).Replace('\', '/')
+              $blob = git hash-object -w $_.FullName
+              git update-index --add --cacheinfo "100644,$blob,$rel"
+            }
+            $tree = git write-tree
+            git fetch --depth=1 origin $env:DIAG_BRANCH 2>$null | Out-Null
+            $parentArgs = @()
+            if ($LASTEXITCODE -eq 0) { $parentArgs = @("-p", "FETCH_HEAD") }
+            $commit = git commit-tree $tree @parentArgs -m "diag: dsh-native run $env:GITHUB_RUN_ID attempt $env:GITHUB_RUN_attempt ($env:GITHUB_SHA)"
+            git push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" "${commit}:refs/heads/$env:DIAG_BRANCH"
+          } finally {
+            Remove-Item $env:GIT_INDEX_FILE -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Upload redacted checksums and test results
         if: always()
