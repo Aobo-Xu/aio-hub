@@ -245,42 +245,60 @@ jobs:
         shell: pwsh
         run: |
           # The launcher-side service spawn silently no-ops on this runner
-          # (ci-diagnostics bundle, run 34270895688: no onPrepare logs, no
-          # captured backend log, worker connects to a never-started port).
+          # (ci-diagnostics bundle, run 34270895688), and step-scoped
+          # Start-Process children are reaped by the runner at step end
+          # (run 34273488908: healthy ready server was gone by lane start).
+          # WMI-created processes hang off WmiPrvSE, outside the runner's
+          # process-tree tracking, so they survive into the lane step.
           # run.ts reuses an already-serving frontend on 1420, the worker
           # connects to an already-listening embedded server on 4459, and the
-          # app has the single-instance plugin, so pre-starting both here is
-          # equivalent to the service-spawned topology.
+          # app has the single-instance plugin, so this topology is equivalent
+          # to the service-spawned one.
+          $workspace = $env:GITHUB_WORKSPACE
+          $viteCmd = Join-Path $env:RUNNER_TEMP "prestart-vite.cmd"
           $viteOut = "$env:RUNNER_TEMP\vite-prestart.out.log"
           $viteErr = "$env:RUNNER_TEMP\vite-prestart.err.log"
-          $viteProc = Start-Process node -ArgumentList "node_modules/vite/bin/vite.js","preview","--host","127.0.0.1","--port","1420","--strictPort" -PassThru -WindowStyle Hidden -RedirectStandardOutput $viteOut -RedirectStandardError $viteErr
+          @(
+            "@echo off"
+            "cd /d `"$workspace`""
+            "node node_modules\vite\bin\vite.js preview --host 127.0.0.1 --port 1420 --strictPort 1>`"$viteOut`" 2>`"$viteErr`""
+          ) | Set-Content $viteCmd -Encoding ascii
+          $viteProc = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "cmd.exe /c `"$viteCmd`""; CurrentDirectory = $workspace }
+          if ($viteProc.ReturnValue -ne 0) { throw "WMI create for vite failed: $($viteProc.ReturnValue)" }
           $frontendUp = $false
           foreach ($wait in 1..30) {
             Start-Sleep -Seconds 1
             try { $null = Invoke-WebRequest "http://127.0.0.1:1420/" -UseBasicParsing -TimeoutSec 2; $frontendUp = $true; break } catch {}
           }
-          "::notice title=prestart-frontend::vite preview on 1420: $frontendUp (pid $($viteProc.Id))"
+          "::notice title=prestart-frontend::vite preview on 1420: $frontendUp (wmi pid $($viteProc.ProcessId))"
+          "$($viteProc.ProcessId)" | Set-Content "$env:RUNNER_TEMP\prestart-vite.pid"
           if (-not $frontendUp) { throw "pre-started vite preview did not serve 1420; see vite-prestart logs" }
-          $env:WDIO_EMBEDDED_SERVER = "true"
-          $env:TAURI_WEBDRIVER_PORT = "4459"
-          $env:AIO_ID_SUFFIX = $env:AIO_E2E_ID_SUFFIX
-          $env:AIO_DATA_DIR = [IO.Path]::GetFullPath($env:AIO_E2E_DATA_DIR)
-          $env:AIO_E2E_MOCK_BASE_URL = "http://127.0.0.1:$env:AIO_E2E_MOCK_PORT"
-          $env:PATH = "$env:AIO_E2E_EDGE_DRIVER_DIR;$env:PATH"
+          $dataDir = [IO.Path]::GetFullPath($env:AIO_E2E_DATA_DIR)
+          $appCmd = Join-Path $env:RUNNER_TEMP "prestart-app.cmd"
           $appOut = "$env:RUNNER_TEMP\lane-app.out.log"
           $appErr = "$env:RUNNER_TEMP\lane-app.err.log"
-          $laneApp = Start-Process $env:AIO_E2E_BINARY -PassThru -WindowStyle Hidden -RedirectStandardOutput $appOut -RedirectStandardError $appErr
+          @(
+            "@echo off"
+            "cd /d `"$workspace`""
+            "set `"WDIO_EMBEDDED_SERVER=true`""
+            "set `"TAURI_WEBDRIVER_PORT=4459`""
+            "set `"AIO_ID_SUFFIX=$($env:AIO_E2E_ID_SUFFIX)`""
+            "set `"AIO_DATA_DIR=$dataDir`""
+            "set `"AIO_E2E_MOCK_BASE_URL=http://127.0.0.1:$($env:AIO_E2E_MOCK_PORT)`""
+            "set `"AIO_DSH_E2E_CRASH_TOKEN=$($env:AIO_DSH_E2E_CRASH_TOKEN)`""
+            "set `"PATH=$($env:AIO_E2E_EDGE_DRIVER_DIR);%PATH%`""
+            "`"$($env:AIO_E2E_BINARY)`" 1>`"$appOut`" 2>`"$appErr`""
+          ) | Set-Content $appCmd -Encoding ascii
+          $appProc = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "cmd.exe /c `"$appCmd`""; CurrentDirectory = $workspace }
+          if ($appProc.ReturnValue -ne 0) { throw "WMI create for app failed: $($appProc.ReturnValue)" }
+          "$($appProc.ProcessId)" | Set-Content "$env:RUNNER_TEMP\lane-app.pid"
           $appReady = $false
           foreach ($wait in 1..24) {
             Start-Sleep -Seconds 5
-            if ($laneApp.HasExited) { break }
             try { $status = Invoke-WebRequest "http://127.0.0.1:4459/status" -UseBasicParsing -TimeoutSec 3; if ($status.StatusCode -eq 200 -and $status.Content -match '"ready"\s*:\s*true') { $appReady = $true; break } } catch {}
           }
           if ($appReady) { Start-Sleep -Seconds 15 }
-          $appExited = $laneApp.HasExited
-          "::notice title=prestart-app::embedded server ready on 4459: $appReady exited=$appExited (pid $($laneApp.Id))"
-          "$($laneApp.Id)" | Set-Content "$env:RUNNER_TEMP\lane-app.pid"
-          "$($viteProc.Id)" | Set-Content "$env:RUNNER_TEMP\prestart-vite.pid"
+          "::notice title=prestart-app::embedded server ready on 4459: $appReady (wmi pid $($appProc.ProcessId))"
           if (-not $appReady) {
             foreach ($logFile in @($appErr, $appOut)) {
               if (Test-Path $logFile) {
@@ -312,7 +330,7 @@ jobs:
           foreach ($pidFile in @("$env:RUNNER_TEMP\lane-app.pid", "$env:RUNNER_TEMP\prestart-vite.pid")) {
             if (Test-Path $pidFile) {
               $recordedPid = Get-Content $pidFile -ErrorAction SilentlyContinue
-              if ($recordedPid) { taskkill /PID $recordedPid /T /F 2>&1 | Out-Null }
+              if ($recordedPid) { & cmd /c "taskkill /PID $recordedPid /T /F >nul 2>nul" }
             }
           }
           Write-Output "--- native E2E listeners ---"
@@ -370,6 +388,7 @@ jobs:
             $summary += '```'
           }
           $summary | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          exit 0
 
       - name: Classify native E2E result
         if: always()
