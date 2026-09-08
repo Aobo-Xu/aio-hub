@@ -25,6 +25,7 @@ jobs:
       AIO_E2E_OFFLINE_RUNTIME: "1"
       AIO_E2E_EDGE_DRIVER_DIR: ${{ github.workspace }}/.e2e-driver
       AIO_E2E_FIREWALL_RULE: AIO-DSH-E2E-OFFLINE-${{ github.run_id }}-${{ github.run_attempt }}
+      AIO_E2E_WDIO_LOG_LEVEL: debug
     steps:
       - name: Check out AIO repository
         uses: actions/checkout@v4
@@ -143,43 +144,6 @@ jobs:
           "::notice title=driver-probe::standalone msedgedriver on 4459 listening=$listening exited=$probeExited exitCode=$probeExitCode"
           if (-not $listening) { throw "msedgedriver cannot listen on 127.0.0.1:4459 standalone (exited=$probeExited exitCode=$probeExitCode)" }
 
-      - name: Probe embedded WebDriver server on the app binary
-        shell: pwsh
-        run: |
-          $env:WDIO_EMBEDDED_SERVER = "true"
-          $env:TAURI_WEBDRIVER_PORT = "4459"
-          $env:AIO_DATA_DIR = "$env:RUNNER_TEMP\app-probe-data"
-          $env:AIO_ID_SUFFIX = "app-probe"
-          $env:PATH = "$env:AIO_E2E_EDGE_DRIVER_DIR;$env:PATH"
-          $probeOut = "$env:RUNNER_TEMP\app-probe.out.log"
-          $probeErr = "$env:RUNNER_TEMP\app-probe.err.log"
-          $appProbe = Start-Process $env:AIO_E2E_BINARY -PassThru -WindowStyle Hidden -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr
-          $appListening = $false
-          foreach ($attempt in 1..12) {
-            Start-Sleep -Seconds 5
-            if ($appProbe.HasExited) { break }
-            $appListening = Test-NetConnection 127.0.0.1 -Port 4459 -InformationLevel Quiet -WarningAction SilentlyContinue
-            if ($appListening) { break }
-          }
-          $appExited = $appProbe.HasExited
-          $appExitCode = if ($appExited) { $appProbe.ExitCode } else { "n/a" }
-          "::notice title=app-probe::embedded wdio server listen on 4459: $appListening exited=$appExited exitCode=$appExitCode"
-          foreach ($logFile in @($probeErr, $probeOut)) {
-            if (Test-Path $logFile) {
-              $logText = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
-              if ($logText) {
-                $logText = $logText -replace "`r?`n", " ~ "
-                $label = Split-Path $logFile -Leaf
-                for ($i = 0; $i -lt [Math]::Min($logText.Length, 5400); $i += 900) {
-                  "::notice title=app-probe-$label::$($logText.Substring($i, [Math]::Min(900, $logText.Length - $i)))"
-                }
-              }
-            }
-          }
-          if (-not $appExited) { taskkill /PID $appProbe.Id /T /F | Out-Null }
-          Start-Sleep -Seconds 2
-          if (-not $appListening) { throw "aiohub embedded WebDriver server did not bind 4459 standalone; see app-probe annotations for stderr" }
-
       - name: Generate one-run crash injection token
         shell: pwsh
         run: |
@@ -230,6 +194,49 @@ jobs:
           "::notice title=driver-probe-offline::msedgedriver loopback listen under offline rule: $offlineListening (exited=$offlineProbeExited)"
           if (-not $offlineListening) { throw "offline firewall rule blocks loopback WebDriver on 4459; rule scope must be fixed before the lane can run" }
 
+      - name: Probe embedded WebDriver server under the offline rule
+        shell: pwsh
+        run: |
+          $env:WDIO_EMBEDDED_SERVER = "true"
+          $env:TAURI_WEBDRIVER_PORT = "4459"
+          $env:AIO_DATA_DIR = "$env:RUNNER_TEMP\app-probe-data"
+          $env:AIO_ID_SUFFIX = "app-probe"
+          $env:PATH = "$env:AIO_E2E_EDGE_DRIVER_DIR;$env:PATH"
+          $probeOut = "$env:RUNNER_TEMP\app-probe.out.log"
+          $probeErr = "$env:RUNNER_TEMP\app-probe.err.log"
+          Remove-Item $probeOut, $probeErr -Force -ErrorAction SilentlyContinue
+          $probeWatch = [Diagnostics.Stopwatch]::StartNew()
+          $appProbe = Start-Process $env:AIO_E2E_BINARY -PassThru -WindowStyle Hidden -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr
+          $appListening = $false
+          foreach ($attempt in 1..24) {
+            Start-Sleep -Seconds 5
+            if ($appProbe.HasExited) { break }
+            $appListening = Test-NetConnection 127.0.0.1 -Port 4459 -InformationLevel Quiet -WarningAction SilentlyContinue
+            if ($appListening) { break }
+          }
+          $probeWatch.Stop()
+          $appExited = $appProbe.HasExited
+          $appExitCode = if ($appExited) { $appProbe.ExitCode } else { "n/a" }
+          "::notice title=app-probe-offline::embedded wdio server under offline rule: listening=$appListening exited=$appExited exitCode=$appExitCode bindSeconds=$([int]$probeWatch.Elapsed.TotalSeconds)"
+          foreach ($logFile in @($probeErr, $probeOut)) {
+            if (Test-Path $logFile) {
+              $logBytes = [IO.File]::ReadAllBytes($logFile)
+              if ($logBytes.Length -gt 0) {
+                $logB64 = [Convert]::ToBase64String($logBytes)
+                $label = Split-Path $logFile -Leaf
+                for ($i = 0; $i -lt [Math]::Min($logB64.Length, 9000); $i += 900) {
+                  "::notice title=app-probe-b64-$label::$($logB64.Substring($i, [Math]::Min(900, $logB64.Length - $i)))"
+                }
+              }
+            }
+          }
+          if (-not $appExited) { taskkill /PID $appProbe.Id /T /F | Out-Null }
+          foreach ($releaseWait in 1..10) {
+            Start-Sleep -Seconds 1
+            if (-not (Get-NetTCPConnection -LocalPort 4459 -State Listen -ErrorAction SilentlyContinue)) { break }
+          }
+          if (-not $appListening) { throw "aiohub embedded WebDriver server did not bind 4459 under the offline rule; decode app-probe-b64 annotations for stdout/stderr" }
+
       - name: Run offline native E2E
         id: offline-native-e2e
         shell: pwsh
@@ -275,9 +282,9 @@ jobs:
             ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
           $wdioLog = Join-Path $env:AIO_E2E_ARTIFACT_DIR "wdio.log"
           if (Test-Path $wdioLog) {
-            $wdioText = (Get-Content $wdioLog -Raw) -replace "`r?`n", " ~ "
-            for ($i = 0; $i -lt [Math]::Min($wdioText.Length, 7200); $i += 900) {
-              "::notice title=wdio-log::$($wdioText.Substring($i, [Math]::Min(900, $wdioText.Length - $i)))"
+            $wdioB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($wdioLog))
+            for ($i = 0; $i -lt [Math]::Min($wdioB64.Length, 27000); $i += 900) {
+              "::notice title=wdio-log-b64::$($wdioB64.Substring($i, [Math]::Min(900, $wdioB64.Length - $i)))"
             }
           }
 
