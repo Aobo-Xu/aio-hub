@@ -285,13 +285,26 @@ jobs:
             ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
           $wdioLog = Join-Path $env:AIO_E2E_ARTIFACT_DIR "wdio.log"
           if (Test-Path $wdioLog) {
-            $wdioRaw = Get-Content $wdioLog -Raw -ErrorAction SilentlyContinue
-            if ($wdioRaw) {
-              $wdioB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($wdioRaw))
-              for ($i = 0; $i -lt [Math]::Min($wdioB64.Length, 27000); $i += 900) {
-                "::notice title=wdio-log-b64::$($wdioB64.Substring($i, [Math]::Min(900, $wdioB64.Length - $i)))"
-              }
+            "::notice title=wdio-log-size::$((Get-Item $wdioLog).Length) bytes (content mostly unflushed nulls; see spec-log-b64 and lane-svc-b64)"
+          }
+          function Emit-B64Chunks($chunkTitle, $filePath, $maxChars) {
+            if (-not (Test-Path $filePath)) { return }
+            $fileBytes = [IO.File]::ReadAllBytes($filePath)
+            if ($fileBytes.Length -eq 0) { return }
+            $fileB64 = [Convert]::ToBase64String($fileBytes)
+            for ($i = 0; $i -lt [Math]::Min($fileB64.Length, $maxChars); $i += 900) {
+              "::notice title=${chunkTitle}::$($fileB64.Substring($i, [Math]::Min(900, $fileB64.Length - $i)))"
             }
+          }
+          $specLog = Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Filter "*.spec-0-0.log" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($specLog) { Emit-B64Chunks "spec-log-b64" $specLog.FullName 9000 }
+          if ($env:AIO_DSH_E2E_LOG -and (Test-Path $env:AIO_DSH_E2E_LOG)) {
+            $svcLog = Join-Path $env:RUNNER_TEMP "dsh-native-svc-filtered.log"
+            Select-String -Path $env:AIO_DSH_E2E_LOG -Pattern "tauri-service|Spawning|App binary|Edge|embedded|ECONNREFUSED|Unable to connect|Severe|onPrepare|worker|PID|ready" |
+              ForEach-Object { $_.Line } | Set-Content $svcLog -Encoding utf8
+            Emit-B64Chunks "lane-svc-b64" $svcLog 9000
+            $headLines = Get-Content $env:AIO_DSH_E2E_LOG -TotalCount 25
+            "::notice title=e2e-log-head::$(($headLines -join ' ~ '))"
           }
 
       - name: Classify native E2E result
@@ -309,6 +322,8 @@ jobs:
         run: |
           Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue |
             Remove-NetFirewallRule
+          ipconfig /flushdns | Out-Null
+          Start-Sleep -Seconds 5
 
       - name: Upload redacted checksums and test results
         if: always()
