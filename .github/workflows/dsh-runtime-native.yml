@@ -283,29 +283,36 @@ jobs:
           }
           Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Recurse -File -ErrorAction SilentlyContinue |
             ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
+          $summary = @()
           $wdioLog = Join-Path $env:AIO_E2E_ARTIFACT_DIR "wdio.log"
           if (Test-Path $wdioLog) {
-            "::notice title=wdio-log-size::$((Get-Item $wdioLog).Length) bytes (content mostly unflushed nulls; see spec-log-b64 and lane-svc-b64)"
+            $wdioBytes = [IO.File]::ReadAllBytes($wdioLog)
+            $wdioText = ([Text.Encoding]::UTF8.GetString($wdioBytes)).Replace([string][char]0, '')
+            $summary += "## wdio.log (non-null content, $($wdioBytes.Length) bytes on disk)"
+            $summary += '```'
+            $summary += $wdioText
+            $summary += '```'
           }
-          function Emit-B64Chunks($chunkTitle, $filePath, $maxChars) {
-            if (-not (Test-Path $filePath)) { return }
-            $fileBytes = [IO.File]::ReadAllBytes($filePath)
-            if ($fileBytes.Length -eq 0) { return }
-            $fileB64 = [Convert]::ToBase64String($fileBytes)
-            for ($i = 0; $i -lt [Math]::Min($fileB64.Length, $maxChars); $i += 900) {
-              "::notice title=${chunkTitle}::$($fileB64.Substring($i, [Math]::Min(900, $fileB64.Length - $i)))"
-            }
+          $specLog = Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like "*.spec-*.log" } | Select-Object -First 1
+          if ($specLog) {
+            $summary += "## worker spec log ($($specLog.Name), $($specLog.Length) bytes)"
+            $summary += '```'
+            $summary += (Get-Content $specLog.FullName -Raw -ErrorAction SilentlyContinue)
+            $summary += '```'
           }
-          $specLog = Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Filter "*.spec-0-0.log" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($specLog) { Emit-B64Chunks "spec-log-b64" $specLog.FullName 9000 }
           if ($env:AIO_DSH_E2E_LOG -and (Test-Path $env:AIO_DSH_E2E_LOG)) {
-            $svcLog = Join-Path $env:RUNNER_TEMP "dsh-native-svc-filtered.log"
-            Select-String -Path $env:AIO_DSH_E2E_LOG -Pattern "tauri-service|Spawning|App binary|Edge|embedded|ECONNREFUSED|Unable to connect|Severe|onPrepare|worker|PID|ready" |
-              ForEach-Object { $_.Line } | Set-Content $svcLog -Encoding utf8
-            Emit-B64Chunks "lane-svc-b64" $svcLog 9000
-            $headLines = Get-Content $env:AIO_DSH_E2E_LOG -TotalCount 25
-            "::notice title=e2e-log-head::$(($headLines -join ' ~ '))"
+            $summary += "## lane stdout (service-filtered, first 200 matches)"
+            $summary += '```'
+            $summary += (Select-String -Path $env:AIO_DSH_E2E_LOG -Pattern "tauri-service|Spawning|App binary|Edge|embedded|ECONNREFUSED|Unable to connect|Severe|onPrepare|worker|PID|ready|ERROR|WARN" |
+              ForEach-Object { $_.Line } | Select-Object -First 200 | Out-String)
+            $summary += '```'
+            $summary += "## lane stdout (head 120 lines)"
+            $summary += '```'
+            $summary += (Get-Content $env:AIO_DSH_E2E_LOG -TotalCount 120 | Out-String)
+            $summary += '```'
           }
+          $summary | Add-Content $env:GITHUB_STEP_SUMMARY -Encoding utf8
 
       - name: Classify native E2E result
         if: always()
