@@ -13,7 +13,9 @@ export type FrontendServerMode = "development" | "preview";
 export function resolveFrontendServerMode(
   presetId: E2ePresetId | undefined
 ): FrontendServerMode {
-  return presetId === "dsh-runtime-native" ? "preview" : "development";
+  return presetId === "dsh-runtime-native" || presetId === "dsh-host-capability"
+    ? "preview"
+    : "development";
 }
 
 export function isExternalCorpusMode(mode: RecallCorpusMode): boolean {
