@@ -23,11 +23,8 @@
   "embeddingProfileId": "e2e-openai-mock",
   "embeddingModelId": "e2e-embedding",
   "embeddingDimension": 8,
-  "startedAt": "2026-09-08T20:22:54.909Z",
-  "finishedAt": "2026-09-08T20:23:02.157Z",
-  "status": "failed",
+  "startedAt": "2026-09-08T20:40:49.539Z",
+  "status": "running",
   "fixtureSeeding": false,
-  "nativeUiEnabled": false,
-  "exitCode": 1,
-  "signalRequested": false
+  "nativeUiEnabled": false
 }

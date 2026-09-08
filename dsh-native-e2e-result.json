@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "status": "infrastructure-blocked",
-  "gatePassed": false,
-  "temporaryWaiver": true,
-  "reasonCode": "WEBDRIVER_UNREACHABLE_BEFORE_TESTS",
-  "formalReleaseBlocked": true
-}
