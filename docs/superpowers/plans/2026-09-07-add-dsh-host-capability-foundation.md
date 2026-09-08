@@ -491,7 +491,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   提交信息：`feat: expose dsh terminals presets and creative host`
 
-### Task 12：增加 Maintenance 与 External Tool Provider 扩展缝
+### Task 12：增加 Maintenance 与 External Tool Provider 扩展缝 ✅
 
 **文件：**
 - 创建：`packages/dsh-bridge/src/maintenance/maintenance-service.ts`
@@ -503,7 +503,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 - 消费：Host lifecycle、Adapter migrate/health/dispose。
 - 产出：maintenance coordination 和未连接实现的 `ExternalToolProvider`。
 
-- [ ] **Step 1：写 RED 契约测试**
+- [x] **Step 1：写 RED 契约测试**
 
   ```ts
   export interface ExternalToolProvider {
@@ -519,19 +519,19 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   断言 maintenance 有 blocker → drain/cancel → stop → migrate → health → restart → commit/rollback 顺序；未配置 provider 时 external capability unavailable，DSH 原生工具不变。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
   运行：`bunx vitest run packages/dsh-bridge/tests/maintenance-provider-seam.test.ts`
 
-- [ ] **Step 3：实现状态机与空 Provider seam**
+- [x] **Step 3：实现状态机与空 Provider seam**
 
   Maintenance fence 新 mutation，但不下载安装包。Provider policy/approval 只能委派给 DSH，不能绕过；本 change 不写 VCP/AIO adapter。
 
-- [ ] **Step 4：运行 GREEN**
+- [x] **Step 4：运行 GREEN**
 
   运行 Step 2 命令并期望全部通过。
 
-- [ ] **Step 5：经授权后提交**
+- [x] **Step 5：经授权后提交**
 
   提交信息：`feat: add host maintenance and provider seams`
 

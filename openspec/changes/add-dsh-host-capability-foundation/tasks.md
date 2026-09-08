@@ -63,9 +63,9 @@
 
 ## 9. 增加面向后续 change 的扩展缝
 
-- [ ] 9.1 实现 maintenance blocker、drain、显式 cancel、stop、migration、health-check、restart 与 rollback-hook 协调状态，并核验新 mutation 被 fence、受管 session 仍可恢复
+- [x] 9.1 实现 maintenance blocker、drain、显式 cancel、stop、migration、health-check、restart 与 rollback-hook 协调状态，并核验新 mutation 被 fence、受管 session 仍可恢复
 - [ ] 9.2 只通过官方 DSH Adapter API 打开或迁移 session schema，并为受管数据实现 backup/restore；核验失败恢复绝不解析 JSONL 或改变 workspace 源码/Git 状态
-- [ ] 9.3 定义版本化 External Tool Provider descriptor、catalog、invocation、有序事件、cancel、policy、typed error 与 lifecycle 契约；核验未连接具体 AIO/VCP provider，且 DSH 原生工具行为不变
+- [x] 9.3 定义版本化 External Tool Provider descriptor、catalog、invocation、有序事件、cancel、policy、typed error 与 lifecycle 契约；核验未连接具体 AIO/VCP provider，且 DSH 原生工具行为不变
 
 ## 10. 集成、门禁与报告同步
 
