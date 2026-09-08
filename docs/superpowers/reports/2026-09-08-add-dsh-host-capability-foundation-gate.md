@@ -3,18 +3,18 @@
 - 日期：2026-09-08（收尾复验更新）
 - 插件仓库：`E:/workspace/projects/aio-hub/.worktrees/aiohub-plugin-dsh-host-capability-foundation`
 - 插件分支：`codex/add-dsh-host-capability-foundation`
-当前提交：`48f59a3`（host-patch 生产接线收尾；此前 `97e1d08`）
+当前提交：`bb08050`；v3 wire 接线与验证修订仍在未提交工作区（未获提交授权）
 
 ## 结论
 
-当前 change 已完成 OpenSpec **46/48** 项。Host 能力基础层、双 Adapter、受管生命周期、会话控制、权威快照/事件恢复、交互与制品边界、终端/preset/dynamic runtime、维护/provider seam 均已落地并通过插件侧聚焦验证（180/180）；生产 IPC 集成测试（10.3）已以双 native lane 补验（8/8 + 6/6，ZIP `1f9db8f9`），文档/任务/provenance 同步（10.6）已完成。
+补录计划遗漏后，当前 change 为 OpenSpec **49/51**。此前 11 行 missing 的共同根因已经在实现层补齐：类型化 Host 协议、RuntimeFacade query/12 态、Supervisor resident 语义路由、Host dispatch 与 capability/generation/lease/requestId fencing 均已落地。最终 ZIP `5ae81e81…` 的构建、打包、校验与 release-shaped Host probe 通过。
 
-本 change **尚未完成**，也不能宣称 Coding Workstation Host Gate 已通过。剩余 2 项：
+本 change **尚未完成**。Host 契约/实现门禁已经通过，但剩余 2 项验证/CI 工作：
 
-- `10.4`：Host Gate 矩阵已重跑为 **10 pass / 11 missing / 0 incompatible**（见 `2026-09-07-add-dsh-coding-workstation-host-gate.md` v2）——未达"R1–R17、R19–R20 全 pass"的勾选条件，保持未勾选；剩余缺口为生产 wire 接线（协议命令 + supervisor 路由 + facade DTO），bridge 实现已就绪；
-- `10.5`：本机双 lane 14/14 通过，但 GitHub 离线 CI lane 未在推送授权下重跑，`formalReleaseBlocked=true` 维持，保持未勾选。
+- `10.3c`：扩展后的 AIO native spec 已覆盖逐行生产断言，但两次均在 spec 前因 WebView2 `HRESULT 0x80070057` 创建失败，按规则仅临时豁免、保持未勾选；
+- `10.5`：GitHub 最新仍是 2026-09-04 的 #5 旧提交失败运行，当前实现未推送；`gatePassed=false`、`temporaryWaiver=true`、`formalReleaseBlocked=true`，保持未勾选。
 
-Windows native lane 已在本机隔离环境成功执行（双 preset），但不替代既定离线 CI 门禁结果。
+因此 Coding Workstation 可继续下一个 change，但当前 change 不能归档，也不能正式发布。
 
 ## 已完成且有证据的范围
 
@@ -64,15 +64,17 @@ Windows native lane 已在本机隔离环境成功执行（双 preset），但�
 
 证据：`.dev-data/dsh-hostcap-r1b/artifacts/dsh-native-e2e-result.json`、`.dev-data/dsh-hostcap-r2b/artifacts/dsh-host-capability-result.json`。
 
-## 尚未通过的门禁与原因
+## v3 生产接线与剩余门禁
 
-### 生产 AIO IPC Host Gate（10.3 已完成 / 10.4 重跑未全过）
+### Host 契约/实现门禁（10.4 已完成）
 
-10.3 的集成测试已按任务枚举场景跑通（见上）。10.4 的 Host Gate 矩阵已重跑（`docs/superpowers/reports/2026-09-07-add-dsh-coding-workstation-host-gate.md` v2）：**10 pass / 11 missing / 0 incompatible**。R8 已从占位升级为真实 DSH facts（lane 验证），R11 interaction 已全链路接线，R2/R3/R13/R14/R18 新增 pass；但 R1（facade RuntimeState 未扩展 upgrading/recovering/incompatible）、R4–R7（workspace 管理/session 生命周期/搜索/历史分页）、R12（queue/restart 无协议命令）、R15–R17（preset/creative/dynamic）、R19–R20（attachment limits/summary）仍 missing——共同根因是 bridge 服务层已交付但 **supervisor resident 路由（仅 9 方法）与协议 SessionCommand（仅 6 变体）未接线**，UI 生产不可达。按 10.4 判定规则（R1–R17、R19–R20 全 pass 才更新为通过），**10.4 不勾选，Host Gate 保持部分通过，Coding Workstation UI 实现继续冻结**。
+协议单一事实源新增 Host read/mutation/result，RuntimeFacade 增加 `query()` 并扩展 RuntimeState，Supervisor resident `command` 统一转发到 Host bridge。最终 ZIP `5ae81e8143d356113ce1aea263a689fec64e408755d823961086aa6439441dcc` 的 verifier 为 `failures:[]`，release-shaped 官方 rc.1 Host probe 已通过 initialize、capability negotiation、workspace.list、attachment.limits、session turn/snapshot、context.summary、cancel 与 shutdown。Host Gate v3 更新为 **21 pass / 0 missing / 0 incompatible**，Coding Workstation 可继续后续 change。
 
-### Windows native E2E（10.5）
+### AIO native E2E / GitHub Actions（10.3c、10.5 未完成）
 
-此前 GitHub Actions 失败发生在 WebDriver session 创建前（`127.0.0.1:4459` 无法连接），属于测试基础设施分类候选，不是产品 E2E 通过证据。本次本机双 lane 已成功（14/14），但未在 GitHub 离线策略下重跑（向 Aobo-Xu fork 推送未授权，上游禁推）。按既定策略，即使后续确认是 WebDriver/端口/Firewall 等基础设施故障，也只能记录：
+扩展后的 `dsh-host-capability` spec 增加 workspace/session/search/history/queue/terminal/preset/dynamic/attachment/summary 的生产断言。使用旧 debug binary 的隔离目录 `.dev-data/dsh-hostcap-r3` 与 `r3b`，以及当前源码重建 debug binary 的 `.dev-data/dsh-hostcap-r4` 三次运行，均在首个 spec 前失败：AIO 后端与 WebDriver 端口正常启动，但 Tauri WebView2 创建窗口返回 `HRESULT 0x80070057（参数错误）`，随后 tauri-service 的 `execute/sync` 超时或 channel closed。第三次已排除旧 binary 因素。该证据属于受控 pre-test 基础设施故障，不能作为产品 E2E 通过。
+
+GitHub Actions 最新可见结果仍为 2026-09-04 的 DSH Runtime Native E2E #5（提交 `b7328ef`，failure）；当前实现未提交/推送，没有新 CI 运行。按既定策略记录：
 
 ```json
 {
@@ -82,13 +84,24 @@ Windows native lane 已在本机隔离环境成功执行（双 preset），但�
 }
 ```
 
-本机结果不是 CI 离线门禁结果，因此不执行豁免，也不把基础设施故障写成 E2E 通过。**10.5 不勾选**。
+因此 **10.3c、10.5 均不勾选**；临时豁免只允许继续后续 change，不允许归档本 change或正式发布。
+
+## 增补：本机双 lane 重跑与 10.3c 勾选（2026-09-09）
+
+前文记录的 WebView2 `HRESULT 0x80070057` 确认为临时环境故障（后续多次运行未再复现）。修复 supervisor capability 映射缺陷（camelCase wire kind 泄漏进 capability gate 导致 `capability-not-negotiated`，并将 Mutate 分支 3 条致命参数路径转为 `invalid-host-params` 结构化 frame）后，重建发行链并在记录的离线策略下重跑本机隔离双 lane，全部通过：
+
+- 最终 ZIP：`d23a70a34fd46107407c1ef0817c3190510c3e4882859c8742ece142ee3bb5ae`（verify-release `failures:[]`；release probe smoke ready，27 capabilities 含 `session.search`、`session.update-queue`）；
+- `dsh-host-capability` 生产 IPC E2E：**7/7 通过**（mutation fence stale-lease 拒绝、权威快照真实 DSH facts、cold recovery、interaction fail-closed、cancel、进程树清理），证据 `.dev-data/dsh-hostcap-r6b/`；
+- `dsh-runtime-native` 回归：**8/8 通过**，证据 `.dev-data/dsh-native-r6c/`；
+- supervisor 套件全绿（stdio 16/16 含 host 错误/参数 fail-closed 结构化断言，clippy `-D warnings` 通过）；bin/ staging 已清理，build-gate 前提复原（2/2）。
+
+OpenSpec 10.3c 已据此勾选（**50/51**）。10.5 仍未勾选：按既定策略本机 lane 不替代 GitHub 离线 CI 门禁；推送 `aobo-validation` 重跑 CI 待用户授权。`formalReleaseBlocked=true` 保持至 CI 门禁取得结果；本机 E2E 已真实通过，故对本机 lane 不再适用临时基础设施豁免表述。
 
 ## 发布状态
 
-- Host Gate：重跑完成，**部分通过（10/21）**；剩余 11 行缺口为生产 wire 接线（协议命令 + supervisor 路由 + facade DTO），无 incompatible 行，恢复路径明确；
-- Windows native E2E：本机双 lane 14/14（ZIP `1f9db8f9`）；GitHub 离线门禁待推送授权后重跑；
+- Host 契约/实现门禁：**21/21 pass**；
+- Windows native E2E：既有场景曾以旧 ZIP 14/14；v3 新断言未执行到测试代码，按基础设施故障临时豁免；
 - 正式发布：`formalReleaseBlocked=true`；
-- Coding Workstation UI：继续保持阻塞，直到 Host Gate 矩阵 R1–R17、R19–R20 全 pass。
+- Coding Workstation UI：可继续后续 change，但其正式验收仍需等待 v3 native E2E 补跑。
 
-后续工作（按优先级）：① 协议/路由/DTO 生产接线（11 行 missing 的唯一根因，bridge 实现已就绪）；② 接线后以生产 IPC 测试逐行复验并重跑 gate 矩阵；③ 推送授权后在 GitHub 离线策略下跑一次 native lane 取得 CI 分类结果；④ 全 pass 后勾选 10.4/10.5 并解除 UI change 冻结。不得重复已通过的插件全量回归，除非出现新的失败证据或影响范围扩大。
+后续工作只剩：① 获得提交授权后让 generated-vs-HEAD 门禁转绿；② 获得推送授权后在 Aobo-Xu 验证仓运行离线 GitHub Actions；③ 在可创建 WebView2 的环境补跑扩展 native lane，真实通过后勾选 10.3c/10.5 并归档。不得把临时豁免写成通过。

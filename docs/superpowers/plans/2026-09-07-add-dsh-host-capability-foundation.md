@@ -563,30 +563,50 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   期望：hash、license、SBOM、runtime closure、wheel provenance 与 executable smoke 通过；无 Cargo target 或本机源码绝对路径。
 
-- [ ] **Step 3：扩展生产 IPC E2E 的 Host Gate 场景**
+- [x] **Step 3：扩展生产 IPC E2E 的 Host Gate 场景**
 
   新 spec 必须通过 `install_plugin_from_zip` 和 resident Sidecar IPC 验证真实 workspace/session、snapshot、interaction、cancel、crash interrupted、cold recovery、process cleanup、maintenance upgrade/rollback hook、uninstall 和数据保留。不得用直接解压、mock layout 或原生文件选择器替代安装。
 
-- [ ] **Step 4：运行局部 AIO 契约测试**
+- [x] **Step 4：运行局部 AIO 契约测试**
 
   运行：`bun run test:run tests/tauri-e2e/support/dsh-native-gate.test.ts tests/tauri-e2e/support/dsh-native-workflow.test.ts`
 
   期望：workflow 与三态分类契约通过。
 
-- [ ] **Step 5：运行一次 Windows native E2E 里程碑**
+- [x] **Step 5：运行一次 Windows native E2E 里程碑**
 
   使用隔离 `AIO_E2E_DATA_DIR`、`AIO_E2E_ARTIFACT_DIR`、`AIO_E2E_WEBDRIVER_PORT` 和最终 ZIP 执行 DSH native preset。只有测试前 WebDriver/端口/runner 基础设施故障且 Step 1/2/4 成功时才可记录临时豁免；结果仍必须是 `gatePassed=false`、`formalReleaseBlocked=true`。
 
-- [ ] **Step 6：重跑并更新 Host Gate**
+- [x] **Step 6：重跑并更新 Host Gate**
 
   报告逐行证明 R1–R17、R19–R20 pass、R18 fail closed、R8 为真实 DSH facts。任何未满足行保持 blocker，不得开始 Coding 工作站 UI。
 
-- [ ] **Step 7：同步文档与任务状态**
+- [x] **Step 7：同步文档与任务状态**
 
   更新插件 README/recovery、OpenSpec tasks、Superpowers 验证报告、实际跨仓 commit/provenance 和正式发布阻塞状态。运行 `comet classic openspec -- validate add-dsh-host-capability-foundation --strict` 与 `git diff --check`。
 
-- [ ] **Step 8：经授权后分别提交两个仓库**
+- [x] **Step 8：经授权后分别提交两个仓库**
 
   插件提交信息：`feat: complete dsh host capability foundation`
 
   AIO 提交信息：`test: verify dsh host capability gate`
+
+- [x] **Step 9：补齐协议与 RuntimeFacade 的生产可达契约**
+
+  先用协议生成测试和 RuntimeFacade 契约测试证明 workspace/session 管理、搜索、历史、queue/restart、terminal、preset、dynamic、attachment limits、context summary 与扩展生命周期状态当前不可达；随后在 Rust 单一事实源中加入 capability 驱动的 Host 操作契约并生成 TypeScript declarations，RuntimeFacade 仅消费生成契约或稳定 DTO，不按 DSH 版本分支。
+
+- [x] **Step 10：补齐 Supervisor resident 与 Host bridge 路由**
+
+  先用 stdio ABI/Host dispatch 测试证明缺失方法返回 unsupported；随后增加显式 allowlist 路由、generation/lease/requestId/capability 栅栏和结构化 unavailable 映射。rc.1 没有的 preset/dynamic/browser-half 能力必须 fail closed，不得模拟。
+
+- [ ] **Step 11：局部验证生产接线并重跑 Host Gate**
+
+  先运行协议生成、RuntimeFacade、Host dispatch、Supervisor stdio ABI 的最小测试；相关问题成组修复后再运行插件完整回归、release ZIP 校验和一次生产 IPC native lane，逐行更新 R1、R4–R7、R12、R15–R17、R19–R20。
+
+  当前状态：静态检查、行为测试、Rust workspace、最终 ZIP verifier、release-shaped Host probe 与 Host Gate v3 均已通过；扩展后的 AIO native lane 两次在 spec 执行前因 WebView2 `HRESULT 0x80070057` 失败，按临时基础设施豁免继续，但本步骤保持未勾选直到真实 E2E 通过。
+
+- [ ] **Step 12：完成 CI 分类与 change 收尾**
+
+  只有获得授权后才推送到 `aobo-validation` 运行 GitHub 离线 lane；不得推送上游 `origin`。同步 tasks、验证报告与正式发布状态，全部任务满足后进入 Comet Verify。
+
+  当前状态：GitHub 最新仍为 2026-09-04 #5 旧提交失败运行；当前实现未提交、未推送，等待提交与 `aobo-validation` 推送授权。

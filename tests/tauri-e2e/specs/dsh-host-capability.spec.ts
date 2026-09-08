@@ -26,6 +26,8 @@ type ResidentResponse = {
   data: {
     state?: string;
     domainGenerationId?: string;
+    contractHash?: string;
+    capabilities?: string[];
     code?: string;
     lease?: { leaseId?: string; mode?: string };
     accepted?: boolean;
@@ -42,6 +44,12 @@ type ResidentResponse = {
     // never carries them. Absent when the session has no pending interaction.
     interactions?: Array<Record<string, unknown>>;
     interactionResolved?: Record<string, unknown>;
+    items?: Array<Record<string, unknown>>;
+    records?: Array<Record<string, unknown>>;
+    hasMore?: boolean;
+    maxCount?: number;
+    provenance?: { source?: string };
+    header?: { id?: string };
   };
 };
 
@@ -153,10 +161,28 @@ async function initializeResident(
   });
 }
 
+async function sendFacadeCommand(
+  pluginId: string,
+  domainGenerationId: string,
+  command: {
+    kind: string;
+    input?: Record<string, unknown>;
+    requestId?: string;
+    sessionId?: string;
+  },
+  lease?: { sessionId: string; leaseId: string }
+): Promise<ResidentResponse> {
+  return sendResident(pluginId, "command", {
+    domainGenerationId,
+    command: { ...command, input: command.input ?? {} },
+    ...(lease === undefined ? {} : { lease: { ...lease, domainGenerationId } }),
+  });
+}
+
 async function waitForSnapshotFact(
   pluginId: string,
   sessionId: string,
-  predicate: (facts: DurableFact[]) => boolean,
+  predicate: (facts: DurableFact[]) => boolean
 ): Promise<ResidentResponse> {
   const deadline = Date.now() + 30_000;
   let last: ResidentResponse | undefined;
@@ -167,7 +193,7 @@ async function waitForSnapshotFact(
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(
-    `session snapshot did not satisfy the fact predicate: ${JSON.stringify(last)}`,
+    `session snapshot did not satisfy the fact predicate: ${JSON.stringify(last)}`
   );
 }
 
@@ -179,6 +205,8 @@ releaseDescribe("DSH host capability bridge", () => {
   let pluginId: string | undefined;
   let installPath: string | undefined;
   let controllerLeaseId: string | undefined;
+  let domainGenerationId: string | undefined;
+  let negotiatedCapabilities = new Set<string>();
   let provider: Awaited<ReturnType<typeof startMockProvider>> | undefined;
   let suitePassed = true;
 
@@ -258,6 +286,82 @@ releaseDescribe("DSH host capability bridge", () => {
     if (!ready.data.domainGenerationId) {
       throw new Error("Resident initialize omitted domainGenerationId.");
     }
+    if (!ready.data.contractHash || !Array.isArray(ready.data.capabilities)) {
+      throw new Error(
+        `Resident initialize omitted the production contract metadata: ${JSON.stringify(ready)}`
+      );
+    }
+    domainGenerationId = ready.data.domainGenerationId;
+    negotiatedCapabilities = new Set(ready.data.capabilities);
+    for (const capability of [
+      "workspace.follow",
+      "session.list",
+      "session.open",
+      "session.history",
+      "session.update-queue",
+      "terminal.open",
+      "attachment.limits",
+    ]) {
+      if (!negotiatedCapabilities.has(capability)) {
+        throw new Error(
+          `Resident initialize omitted negotiated capability ${capability}.`
+        );
+      }
+    }
+  });
+
+  it("routes capability-driven workspace and attachment reads and rejects unsupported extensions", async () => {
+    if (!pluginId || !domainGenerationId) {
+      throw new Error(
+        "plugin must be initialized before Host capability queries"
+      );
+    }
+
+    const workspaces = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "workspace.list",
+    });
+    if (workspaces.type !== "result" || !Array.isArray(workspaces.data.items)) {
+      throw new Error(
+        `workspace.list was not production reachable: ${JSON.stringify(workspaces)}`
+      );
+    }
+
+    const limits = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "attachment.limits",
+    });
+    if (
+      limits.type !== "result" ||
+      limits.data.maxCount !== 8 ||
+      limits.data.provenance?.source !== "aio-dsh-host"
+    ) {
+      throw new Error(
+        `attachment.limits was not production reachable: ${JSON.stringify(limits)}`
+      );
+    }
+
+    for (const kind of [
+      "preset.catalog",
+      "dynamic.host.inventory",
+      "session.restart",
+    ]) {
+      const unavailable = await sendFacadeCommand(
+        pluginId,
+        domainGenerationId,
+        {
+          kind,
+          requestId: `unsupported-${kind}`,
+          sessionId: SESSION_ID,
+        }
+      );
+      if (
+        unavailable.type !== "error" ||
+        unavailable.data.code !== "capability-not-negotiated"
+      ) {
+        throw new Error(
+          `${kind} must fail closed from negotiated capabilities: ${JSON.stringify(unavailable)}`
+        );
+      }
+    }
   });
 
   it("projects an authoritative snapshot with real DSH facts through the host bridge", async () => {
@@ -318,15 +422,20 @@ releaseDescribe("DSH host capability bridge", () => {
       SESSION_ID,
       (facts) =>
         facts.some(
-          (fact) => fact.kind === "user/message" && factText(fact).includes("host capability marker"),
+          (fact) =>
+            fact.kind === "user/message" &&
+            factText(fact).includes("host capability marker")
         ) &&
         facts.some(
-          (fact) => fact.kind === "assistant/message" && factText(fact).includes(MARKER),
-        ),
+          (fact) =>
+            fact.kind === "assistant/message" && factText(fact).includes(MARKER)
+        )
     );
     const snap = snapshot.data.snapshot;
     if (!snap || snap.cursor === undefined || snap.seq === undefined) {
-      throw new Error(`snapshot omitted cursor/seq: ${JSON.stringify(snapshot)}`);
+      throw new Error(
+        `snapshot omitted cursor/seq: ${JSON.stringify(snapshot)}`
+      );
     }
     if (snap.cursor === "cursor-0" && (snap.durableFacts ?? []).length === 0) {
       throw new Error(
@@ -334,10 +443,16 @@ releaseDescribe("DSH host capability bridge", () => {
       );
     }
     if (!snap.sessionId || snap.sessionId !== SESSION_ID) {
-      throw new Error(`snapshot sessionId mismatch: ${JSON.stringify(snap.sessionId)}`);
+      throw new Error(
+        `snapshot sessionId mismatch: ${JSON.stringify(snap.sessionId)}`
+      );
     }
     const kinds = (snap.durableFacts ?? []).map((fact) => fact.kind);
-    for (const required of ["turn/start", "user/message", "assistant/message"]) {
+    for (const required of [
+      "turn/start",
+      "user/message",
+      "assistant/message",
+    ]) {
       if (!kinds.includes(required)) {
         throw new Error(
           `snapshot facts missing ${required}: kinds=${JSON.stringify(kinds)}`
@@ -355,6 +470,101 @@ releaseDescribe("DSH host capability bridge", () => {
       throw new Error(
         `interactions field must be an array when present: ${JSON.stringify(snapshot.data.interactions)}`
       );
+    }
+
+    if (!domainGenerationId || !controllerLeaseId) {
+      throw new Error("generation and controller lease must remain available");
+    }
+
+    const sessions = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "session.list",
+    });
+    if (
+      sessions.type !== "result" ||
+      !Array.isArray(sessions.data.items) ||
+      !sessions.data.items.some((item) => item.sessionId === SESSION_ID)
+    ) {
+      throw new Error(
+        `session.list omitted the live session: ${JSON.stringify(sessions)}`
+      );
+    }
+
+    const opened = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "session.open",
+      input: { sessionId: SESSION_ID },
+    });
+    if (opened.type !== "result" || opened.data.header?.id !== SESSION_ID) {
+      throw new Error(
+        `session.open was not production reachable: ${JSON.stringify(opened)}`
+      );
+    }
+
+    const history = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "session.history",
+      input: { sessionId: SESSION_ID, throughSeq: snap.seq },
+    });
+    if (
+      history.type !== "result" ||
+      !Array.isArray(history.data.records) ||
+      history.data.records.length === 0
+    ) {
+      throw new Error(
+        `session.history was not production reachable: ${JSON.stringify(history)}`
+      );
+    }
+
+    if (negotiatedCapabilities.has("session.search")) {
+      const search = await sendFacadeCommand(pluginId, domainGenerationId, {
+        kind: "session.search",
+        input: { query: "host capability marker" },
+      });
+      if (search.type !== "result" || !Array.isArray(search.data.items)) {
+        throw new Error(
+          `session.search was not production reachable: ${JSON.stringify(search)}`
+        );
+      }
+    }
+
+    const summary = await sendFacadeCommand(pluginId, domainGenerationId, {
+      kind: "context.summary",
+      input: {
+        workspaceId: "host-capability-workspace",
+        sessionId: SESSION_ID,
+        maxChars: 1024,
+      },
+    });
+    if (
+      summary.type !== "result" ||
+      summary.data.provenance?.source !== "dsh"
+    ) {
+      throw new Error(
+        `context.summary was not production reachable: ${JSON.stringify(summary)}`
+      );
+    }
+
+    for (const kind of ["session.updateQueue", "terminal.open"]) {
+      const fenced = await sendFacadeCommand(
+        pluginId,
+        domainGenerationId,
+        {
+          kind,
+          requestId: `stale-${kind}`,
+          sessionId: SESSION_ID,
+        },
+        { sessionId: SESSION_ID, leaseId: "lease-does-not-exist" }
+      );
+      // Lease fencing surfaces through the established rejection wire shape
+      // (result + accepted:false + rejection.code), the same contract the
+      // interaction stale-lease assertions in this suite verify.
+      if (
+        fenced.type !== "result" ||
+        fenced.data.accepted !== false ||
+        fenced.data.rejection?.code !== "stale-lease"
+      ) {
+        throw new Error(
+          `${kind} must reach the production mutation fence: ${JSON.stringify(fenced)}`
+        );
+      }
     }
 
     const codingRequests = provider.requests.filter((request) => {
@@ -380,7 +590,9 @@ releaseDescribe("DSH host capability bridge", () => {
 
   it("wires interaction.respond through the production chain and fails closed on unknown correlations", async () => {
     if (!pluginId || !controllerLeaseId) {
-      throw new Error("plugin and lease must exist before the interaction probe");
+      throw new Error(
+        "plugin and lease must exist before the interaction probe"
+      );
     }
     // The full AIO IPC → supervisor → host broker chain must reject an
     // interaction response that was never issued, with the structured
@@ -457,13 +669,12 @@ releaseDescribe("DSH host capability bridge", () => {
       );
     }
 
-    const recovered = await waitForSnapshotFact(
-      pluginId,
-      SESSION_ID,
-      (facts) =>
-        facts.some(
-          (fact) => fact.kind === "user/message" && factText(fact).includes("host capability marker"),
-        ),
+    const recovered = await waitForSnapshotFact(pluginId, SESSION_ID, (facts) =>
+      facts.some(
+        (fact) =>
+          fact.kind === "user/message" &&
+          factText(fact).includes("host capability marker")
+      )
     );
     const snap = recovered.data.snapshot;
     if (!snap || (snap.durableFacts ?? []).length === 0) {
