@@ -1,18 +1,18 @@
-2026-09-08T19:58:27.567Z INFO @wdio/local-runner: Run worker command: run
-2026-09-08T19:58:27.589Z DEBUG @wdio/runner: init remote session
-2026-09-08T19:58:27.591Z DEBUG @wdio/utils:initializeServices: initialize service "@wdio/tauri-service" as NPM package
-2026-09-08T19:58:28.051Z DEBUG @wdio/runner: init remote session
-2026-09-08T19:58:28.052Z INFO webdriver: Initiate new session using the WebDriver protocol
-2026-09-08T19:58:28.053Z INFO @wdio/utils: Connecting to existing driver at http://127.0.0.1:4459/
-2026-09-08T19:58:28.059Z INFO webdriver: [POST] http://127.0.0.1:4459/session
-2026-09-08T19:58:28.080Z WARN webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
-2026-09-08T19:58:28.081Z INFO webdriver: Retrying 1/2
-2026-09-08T19:58:28.081Z INFO webdriver: [POST] http://127.0.0.1:4459/session
-2026-09-08T19:58:28.591Z WARN webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
-2026-09-08T19:58:28.591Z INFO webdriver: Retrying 2/2
-2026-09-08T19:58:28.591Z INFO webdriver: [POST] http://127.0.0.1:4459/session
-2026-09-08T19:58:28.593Z ERROR webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
-2026-09-08T19:58:28.593Z ERROR webdriver: Error: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
+2026-09-08T20:23:00.591Z INFO @wdio/local-runner: Run worker command: run
+2026-09-08T20:23:00.611Z DEBUG @wdio/runner: init remote session
+2026-09-08T20:23:00.614Z DEBUG @wdio/utils:initializeServices: initialize service "@wdio/tauri-service" as NPM package
+2026-09-08T20:23:01.079Z DEBUG @wdio/runner: init remote session
+2026-09-08T20:23:01.081Z INFO webdriver: Initiate new session using the WebDriver protocol
+2026-09-08T20:23:01.081Z INFO @wdio/utils: Connecting to existing driver at http://127.0.0.1:4459/
+2026-09-08T20:23:01.103Z INFO webdriver: [POST] http://127.0.0.1:4459/session
+2026-09-08T20:23:01.128Z WARN webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
+2026-09-08T20:23:01.128Z INFO webdriver: Retrying 1/2
+2026-09-08T20:23:01.128Z INFO webdriver: [POST] http://127.0.0.1:4459/session
+2026-09-08T20:23:01.646Z WARN webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
+2026-09-08T20:23:01.646Z INFO webdriver: Retrying 2/2
+2026-09-08T20:23:01.647Z INFO webdriver: [POST] http://127.0.0.1:4459/session
+2026-09-08T20:23:01.648Z ERROR webdriver: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
+2026-09-08T20:23:01.649Z ERROR webdriver: Error: WebDriverError: Request failed with error code ECONNREFUSED when running "http://127.0.0.1:4459/session" with method "POST"
     at FetchRequest._libRequest (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/webdriver@9.29.1/node_modules/webdriver/build/node.js:2194:13)
     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
     at async FetchRequest._request (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/webdriver@9.29.1/node_modules/webdriver/build/node.js:2220:20)
@@ -22,7 +22,7 @@
     at async Runner._startSession (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:836:24)
     at async Runner._initSession (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:810:22)
     at async Runner.run (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:711:16)
-2026-09-08T19:58:28.639Z ERROR @wdio/runner: Error: Unable to connect to "http://127.0.0.1:4459/", make sure browser driver is running on that address.
+2026-09-08T20:23:01.692Z ERROR @wdio/runner: Error: Unable to connect to "http://127.0.0.1:4459/", make sure browser driver is running on that address.
 It seems like the service failed to start or is rejecting any connections.
     at startWebDriverSession (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/webdriver@9.29.1/node_modules/webdriver/build/node.js:1361:11)
     at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
@@ -31,4 +31,4 @@ It seems like the service failed to start or is rejecting any connections.
     at async Runner._startSession (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:836:24)
     at async Runner._initSession (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:810:22)
     at async Runner.run (file:///D:/a/aio-hub/aio-hub/node_modules/.bun/@wdio+runner@9.29.1+6e4645fdb690462d/node_modules/@wdio/runner/build/index.js:711:16)
-2026-09-08T19:58:28.639Z DEBUG @wdio/utils:shim: Finished to run "after" hook in 0ms
+2026-09-08T20:23:01.693Z DEBUG @wdio/utils:shim: Finished to run "after" hook in 0ms

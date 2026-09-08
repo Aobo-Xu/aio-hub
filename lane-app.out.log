@@ -1,0 +1,23 @@
+[2026-09-08 20:22:24.027] [TRACE] [os_info::imp] windows::current_platform is called
+[2026-09-08 20:22:24.028] [TRACE] [os_info::imp] Returning Info { os_type: Windows, version: Semantic(10, 0, 26100), edition: Some("Windows 11 ServerDatacenter"), codename: None, bitness: X64, architecture: Some("x86_64") }
+[2026-09-08 20:22:24.036] [INFO] [tauri_plugin_wdio_webdriver] WDIO WebDriver plugin initialized on port 4459
+[2026-09-08 20:22:24.037] [INFO] [aio_hub_lib] [SCOPE] 已允许访问数据目录 (fs): "D:\\a\\aio-hub\\aio-hub\\.e2e-data\\dsh-native"
+[2026-09-08 20:22:24.039] [INFO] [tauri_plugin_wdio_webdriver::server] WebDriver server listening on http://127.0.0.1:4459
+[2026-09-08 20:22:24.046] [INFO] [aio_hub_lib] [Recall] repository 与内存读模型已就绪
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] ========================================
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] 🚀 应用启动: AIO Hub
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] 📦 版本: v0.7.0-alpha.4
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] 🖥️  系统: windows (x86_64)
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] ⏰ 时间: 2026-09-08 20:22:24.026
+[2026-09-08 20:22:24.047] [INFO] [aio_hub_lib] ========================================
+[2026-09-08 20:22:24.602] [DEBUG] [tauri_plugin_wdio_webdriver::platform::windows] Registered script dialog handler for webview
+[2026-09-08 20:22:24.602] [INFO] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 后端 watchdog 已启动: interval_ms=10000, stale_after_ms=20000
+[2026-09-08 20:22:24.744] [INFO] [aio_hub_lib::commands::window_manager] [DRAG] 全局鼠标监听器已启动
+[2026-09-08 20:22:24.748] [DEBUG] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 窗口事件: label=main, event=Focused, details=true, at=2026-09-08 20:22:24.748
+[2026-09-08 20:22:24.749] [DEBUG] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 窗口事件: label=main, event=Focused, details=false, at=2026-09-08 20:22:24.749
+[2026-09-08 20:22:24.749] [DEBUG] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 窗口事件: label=main, event=Focused, details=true, at=2026-09-08 20:22:24.749
+[2026-09-08 20:22:25.762] [INFO] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 页面加载事件: label=main, event=Started, url=http://localhost:1420/, at=2026-09-08 20:22:25.762
+[2026-09-08 20:22:27.702] [INFO] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 页面加载事件: label=main, event=Finished, url=http://localhost:1420/, at=2026-09-08 20:22:27.701
+[2026-09-08 20:22:27.714] [INFO] [aio_hub_lib::frontend_monitor] [FRONTEND_MONITOR] 前端 ready: label=main, phase=vue-mounted, seq=1, path=/, route=Some("/"), readyState=interactive, visibility=visible, viewport=Some(FrontendViewportPayload { width: 1028.0, height: 768.0, device_pixel_ratio: 1.0 }), ua=Some("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+[2026-09-08 20:22:27.862] [DEBUG] [aio_hub_lib::commands::window_manager] [WINDOW] 设置窗口 'main' 阴影为: true
+[2026-09-08 20:22:28.994] [TRACE] [axum::serve] connection 127.0.0.1:62568 accepted
