@@ -128,6 +128,20 @@ jobs:
           Expand-Archive "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip" -DestinationPath $env:AIO_E2E_EDGE_DRIVER_DIR -Force
           Remove-Item "$env:AIO_E2E_EDGE_DRIVER_DIR/driver.zip"
           if (-not (Test-Path "$env:AIO_E2E_EDGE_DRIVER_DIR/msedgedriver.exe")) { throw "Edge WebDriver download failed for $edge" }
+          $driverExe = "$env:AIO_E2E_EDGE_DRIVER_DIR\msedgedriver.exe"
+          $driverVersion = (& $driverExe --version) -join " "
+          $wv2Key = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+          $wv2Version = (Get-ItemProperty $wv2Key -ErrorAction SilentlyContinue).pv
+          "::notice title=driver-versions::Edge=$edge WebView2Runtime=$wv2Version driver=$driverVersion"
+          $probe = Start-Process $driverExe -ArgumentList "--port=4459" -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 5
+          $listening = Test-NetConnection 127.0.0.1 -Port 4459 -InformationLevel Quiet -WarningAction SilentlyContinue
+          $probeExited = $probe.HasExited
+          $probeExitCode = if ($probeExited) { $probe.ExitCode } else { "n/a" }
+          Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "::notice title=driver-probe::standalone msedgedriver on 4459 listening=$listening exited=$probeExited exitCode=$probeExitCode"
+          if (-not $listening) { throw "msedgedriver cannot listen on 127.0.0.1:4459 standalone (exited=$probeExited exitCode=$probeExitCode)" }
 
       - name: Generate one-run crash injection token
         shell: pwsh
@@ -170,6 +184,14 @@ jobs:
           Write-Output ("offline rule interfaces: " + ($interfaceFilter.InterfaceAlias -join ","))
           Write-Output ("offline rule local addresses: " + ($addressFilter.LocalAddress -join ","))
           Write-Output ("offline rule remote addresses: " + ($addressFilter.RemoteAddress -join ","))
+          $offlineProbe = Start-Process "$env:AIO_E2E_EDGE_DRIVER_DIR\msedgedriver.exe" -ArgumentList "--port=4459" -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 5
+          $offlineListening = Test-NetConnection 127.0.0.1 -Port 4459 -InformationLevel Quiet -WarningAction SilentlyContinue
+          $offlineProbeExited = $offlineProbe.HasExited
+          Stop-Process -Id $offlineProbe.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "::notice title=driver-probe-offline::msedgedriver loopback listen under offline rule: $offlineListening (exited=$offlineProbeExited)"
+          if (-not $offlineListening) { throw "offline firewall rule blocks loopback WebDriver on 4459; rule scope must be fixed before the lane can run" }
 
       - name: Run offline native E2E
         id: offline-native-e2e
@@ -199,9 +221,26 @@ jobs:
           Write-Output "--- offline firewall rule ---"
           $rule = Get-NetFirewallRule -DisplayName $env:AIO_E2E_FIREWALL_RULE -ErrorAction SilentlyContinue
           if ($rule) {
-            $rule | Get-NetFirewallAddressFilter | Format-List
-            $rule | Get-NetFirewallInterfaceFilter | Format-List
+            $rule | Get-NetFirewallAddressFilter | Format-List *
+            $rule | Get-NetFirewallInterfaceFilter | Format-List *
           }
+          $listenerText = (Get-NetTCPConnection -State Listen -LocalPort 1420,4459 -ErrorAction SilentlyContinue |
+            ForEach-Object { "$($_.LocalAddress):$($_.LocalPort)" }) -join ","
+          "::notice title=post-lane-listeners::$listenerText"
+          $processText = (Get-Process aiohub,msedgedriver,msedge,bun,node -ErrorAction SilentlyContinue |
+            ForEach-Object { "$($_.ProcessName):$($_.Id)" }) -join ","
+          "::notice title=post-lane-processes::$processText"
+          if ($env:AIO_DSH_E2E_LOG -and (Test-Path $env:AIO_DSH_E2E_LOG)) {
+            $logTail = Get-Content $env:AIO_DSH_E2E_LOG -Tail 30
+            "::notice title=e2e-log-tail::$(($logTail -join ' ~ '))"
+          }
+          Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object { "::notice title=artifact-file::$($_.Name) $($_.Length) bytes" }
+          Get-ChildItem $env:AIO_E2E_ARTIFACT_DIR -Recurse -File -Filter "*.log" -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              $artifactLogTail = Get-Content $_.FullName -Tail 20 -ErrorAction SilentlyContinue
+              "::notice title=artifact-log::$($_.Name): $(($artifactLogTail -join ' ~ '))"
+            }
 
       - name: Classify native E2E result
         if: always()
