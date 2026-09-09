@@ -107,7 +107,7 @@ describe("dsh-runtime-native required workflow", () => {
       "Aobo-Xu/aiohub-plugin-dsh-workspace"
     );
     expect(String(checkout?.with?.ref)).toBe(
-      "14c76483bcf7a7bdab9d4b59fb93e1ddad8b4bb0"
+      "5f9af2dd31994016220fc091d5eed6bf14260cd1"
     );
   });
 
@@ -161,7 +161,7 @@ describe("dsh-runtime-native required workflow", () => {
     }
   });
 
-  it("denies external outbound traffic while preserving loopback and always restores the firewall", () => {
+  it("blocks tested programs' external egress while preserving loopback and always restores the firewall", () => {
     const workflow = loadWorkflow();
     const e2eJob = workflow.jobs?.["native-e2e"];
     const steps = e2eJob?.steps ?? [];
@@ -173,8 +173,10 @@ describe("dsh-runtime-native required workflow", () => {
         step.run?.includes("New-NetFirewallRule") &&
         step.run.includes("-Action Block") &&
         step.run.includes("-RemoteAddress Internet") &&
-        step.run.includes("-InterfaceAlias $externalInterfaces") &&
-        step.run.includes("-LocalAddress $externalLocalAddresses")
+        step.run.includes("-Program $program") &&
+        step.run.includes("$blockedPrograms.Add") &&
+        step.run.includes("Test-NetConnection 127.0.0.1 -Port 4459") &&
+        step.run.includes("outbound network remains reachable")
     );
     const restoreIndex = steps.findIndex(
       (step) =>
@@ -192,6 +194,7 @@ describe("dsh-runtime-native required workflow", () => {
     );
     expect(denyIndex).toBeLessThan(testIndex);
     expect(restoreIndex).toBeGreaterThan(testIndex);
+    expect(runs).not.toContain("-InterfaceAlias $externalInterfaces");
   });
 
   it("generates a fresh crash-injection token before the offline test", () => {

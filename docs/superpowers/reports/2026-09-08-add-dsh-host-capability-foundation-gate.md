@@ -1,20 +1,15 @@
 # DSH Host Capability Foundation 验证报告
 
-- 日期：2026-09-08（收尾复验更新）
+- 日期：2026-09-09（最终 CI 复核更新）
 - 插件仓库：`E:/workspace/projects/aio-hub/.worktrees/aiohub-plugin-dsh-host-capability-foundation`
 - 插件分支：`codex/add-dsh-host-capability-foundation`
-当前提交：`bb08050`；v3 wire 接线与验证修订仍在未提交工作区（未获提交授权）
+当前插件提交：`5f9af2dd`；AIO 验证分支提交：`6aabee059`（门禁实际执行提交：`17eb15cb1`）
 
 ## 结论
 
-补录计划遗漏后，当前 change 为 OpenSpec **49/51**。此前 11 行 missing 的共同根因已经在实现层补齐：类型化 Host 协议、RuntimeFacade query/12 态、Supervisor resident 语义路由、Host dispatch 与 capability/generation/lease/requestId fencing 均已落地。最终 ZIP `5ae81e81…` 的构建、打包、校验与 release-shaped Host probe 通过。
+OpenSpec **51/51**。类型化 Host 协议、RuntimeFacade query/12 态、Supervisor resident 语义路由和 Host dispatch 均已落地；最终生产 IPC native E2E 已在 GitHub Actions run `34280645166` 通过（8/8，非豁免）。
 
-本 change **尚未完成**。Host 契约/实现门禁已经通过，但剩余 2 项验证/CI 工作：
-
-- `10.3c`：扩展后的 AIO native spec 已覆盖逐行生产断言，但两次均在 spec 前因 WebView2 `HRESULT 0x80070057` 创建失败，按规则仅临时豁免、保持未勾选；
-- `10.5`：GitHub 最新仍是 2026-09-04 的 #5 旧提交失败运行，当前实现未推送；`gatePassed=false`、`temporaryWaiver=true`、`formalReleaseBlocked=true`，保持未勾选。
-
-因此 Coding Workstation 可继续下一个 change，但当前 change 不能归档，也不能正式发布。
+本 change 的实现与门禁任务均已完成，已进入 Comet Verify/归档阶段。历史本机失败、临时豁免和旧产物 hash 仍保留在下文，均以当时状态为准；它们不再代表当前发布状态。
 
 ## 已完成且有证据的范围
 
@@ -64,13 +59,13 @@
 
 证据：`.dev-data/dsh-hostcap-r1b/artifacts/dsh-native-e2e-result.json`、`.dev-data/dsh-hostcap-r2b/artifacts/dsh-host-capability-result.json`。
 
-## v3 生产接线与剩余门禁
+## v3 生产接线与剩余门禁（历史记录，已由后续 E2E 结果替代）
 
 ### Host 契约/实现门禁（10.4 已完成）
 
 协议单一事实源新增 Host read/mutation/result，RuntimeFacade 增加 `query()` 并扩展 RuntimeState，Supervisor resident `command` 统一转发到 Host bridge。最终 ZIP `5ae81e8143d356113ce1aea263a689fec64e408755d823961086aa6439441dcc` 的 verifier 为 `failures:[]`，release-shaped 官方 rc.1 Host probe 已通过 initialize、capability negotiation、workspace.list、attachment.limits、session turn/snapshot、context.summary、cancel 与 shutdown。Host Gate v3 更新为 **21 pass / 0 missing / 0 incompatible**，Coding Workstation 可继续后续 change。
 
-### AIO native E2E / GitHub Actions（10.3c、10.5 未完成）
+### AIO native E2E / GitHub Actions（当时 10.3c、10.5 未完成）
 
 扩展后的 `dsh-host-capability` spec 增加 workspace/session/search/history/queue/terminal/preset/dynamic/attachment/summary 的生产断言。使用旧 debug binary 的隔离目录 `.dev-data/dsh-hostcap-r3` 与 `r3b`，以及当前源码重建 debug binary 的 `.dev-data/dsh-hostcap-r4` 三次运行，均在首个 spec 前失败：AIO 后端与 WebDriver 端口正常启动，但 Tauri WebView2 创建窗口返回 `HRESULT 0x80070057（参数错误）`，随后 tauri-service 的 `execute/sync` 超时或 channel closed。第三次已排除旧 binary 因素。该证据属于受控 pre-test 基础设施故障，不能作为产品 E2E 通过。
 
@@ -113,11 +108,9 @@ OpenSpec 10.3c 已据此勾选（**50/51**）。10.5 仍未勾选：按既定策
 
 发布状态更新：Host Gate v3 21/21（既有）；Windows native E2E GitHub 离线门禁 **passed（非豁免）**；`temporaryWaiver=false`；Coding Workstation UI 阻塞已按 Host Gate v3 解除；本 change 进入 Comet Verify/归档阶段。
 
-## 发布状态
+## 当前发布状态
 
 - Host 契约/实现门禁：**21/21 pass**；
-- Windows native E2E：既有场景曾以旧 ZIP 14/14；v3 新断言未执行到测试代码，按基础设施故障临时豁免；
-- 正式发布：`formalReleaseBlocked=true`；
-- Coding Workstation UI：可继续后续 change，但其正式验收仍需等待 v3 native E2E 补跑。
-
-后续工作只剩：① 获得提交授权后让 generated-vs-HEAD 门禁转绿；② 获得推送授权后在 Aobo-Xu 验证仓运行离线 GitHub Actions；③ 在可创建 WebView2 的环境补跑扩展 native lane，真实通过后勾选 10.3c/10.5 并归档。不得把临时豁免写成通过。
+- Windows native E2E：GitHub Actions run `34280645166` 在插件 pin `5f9af2dd` 上执行 `dsh-runtime-native` **8/8**（31.1s）；分类器为 `status=passed`、`gatePassed=true`、`temporaryWaiver=false`、`reasonCode=E2E_PASSED`、`formalReleaseBlocked=false`。
+- 正式发布门禁：本 change 的 native E2E 条件已满足；仍须按常规发布流程复核当前分支、签名与最终发布产物，不能将本次验证当作实际发版。
+- Coding Workstation UI：Host 能力前置门禁已解除，可继续其独立 change。

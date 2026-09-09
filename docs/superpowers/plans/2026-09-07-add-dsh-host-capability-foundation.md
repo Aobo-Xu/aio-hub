@@ -569,7 +569,7 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
 - [x] **Step 4：运行局部 AIO 契约测试**
 
-  运行：`bun run test:run tests/tauri-e2e/support/dsh-native-gate.test.ts tests/tauri-e2e/support/dsh-native-workflow.test.ts`
+  运行：`bunx vitest --config tests/tauri-e2e/vitest.config.ts run support/dsh-native-gate.test.ts support/dsh-native-workflow.test.ts`
 
   期望：workflow 与三态分类契约通过。
 
@@ -599,14 +599,14 @@ base-ref: ae17fbaee7f991e1f013d63ab9e1e28871b7f86d
 
   先用 stdio ABI/Host dispatch 测试证明缺失方法返回 unsupported；随后增加显式 allowlist 路由、generation/lease/requestId/capability 栅栏和结构化 unavailable 映射。rc.1 没有的 preset/dynamic/browser-half 能力必须 fail closed，不得模拟。
 
-- [ ] **Step 11：局部验证生产接线并重跑 Host Gate**
+- [x] **Step 11：局部验证生产接线并重跑 Host Gate**
 
   先运行协议生成、RuntimeFacade、Host dispatch、Supervisor stdio ABI 的最小测试；相关问题成组修复后再运行插件完整回归、release ZIP 校验和一次生产 IPC native lane，逐行更新 R1、R4–R7、R12、R15–R17、R19–R20。
 
-  当前状态：静态检查、行为测试、Rust workspace、最终 ZIP verifier、release-shaped Host probe 与 Host Gate v3 均已通过；扩展后的 AIO native lane 两次在 spec 执行前因 WebView2 `HRESULT 0x80070057` 失败，按临时基础设施豁免继续，但本步骤保持未勾选直到真实 E2E 通过。
+  完成状态：协议/RuntimeFacade/Host dispatch/Supervisor stdio 的聚焦测试、插件完整检查、release ZIP verifier、release-shaped Host probe 与 Host Gate v3 均通过；本机生产 IPC lane 随后达到 `dsh-host-capability` 7/7 与 `dsh-runtime-native` 8/8。
 
-- [ ] **Step 12：完成 CI 分类与 change 收尾**
+- [x] **Step 12：完成 CI 分类与 change 收尾**
 
   只有获得授权后才推送到 `aobo-validation` 运行 GitHub 离线 lane；不得推送上游 `origin`。同步 tasks、验证报告与正式发布状态，全部任务满足后进入 Comet Verify。
 
-  当前状态：GitHub 最新仍为 2026-09-04 #5 旧提交失败运行；当前实现未提交、未推送，等待提交与 `aobo-validation` 推送授权。
+  完成状态：经授权仅推送 `Aobo-Xu` 验证仓；GitHub Actions run `34280645166`（AIO `17eb15cb1`、插件 pin `5f9af2dd`）离线 native lane 8/8 通过，分类器为 `E2E_PASSED`、`gatePassed=true`、`temporaryWaiver=false`。`openspec validate --strict` 通过，change 可进入 Verify/归档。

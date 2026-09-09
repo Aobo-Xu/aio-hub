@@ -5,7 +5,7 @@
 - **重跑日期**: 2026-09-08（生产 wire 补齐后 v3）
 - **任务**: OpenSpec task 10.4（host-capability change）/ 本 change OpenSpec task 1.1
 - **产物语言**: zh-CN
-- **结论**: **Host 契约与生产实现门禁通过（21 pass / 0 missing / 0 incompatible）**。协议单一事实源、RuntimeFacade、Supervisor resident 路由和 Host bridge 已补齐此前 11 行 wire 缺口；Coding 工作站可继续后续 change。新增 AIO 原生 E2E 断言因 WebView2 在 spec 前创建失败而采用临时基础设施豁免，**不计为 E2E 通过，正式发布仍阻塞**。
+- **结论**: **Host 契约与生产实现门禁通过（21 pass / 0 missing / 0 incompatible）**。后续 GitHub Actions run `34280645166` 已以插件 pin `5f9af2dd` 完成 Windows native E2E **8/8**（31.1s），分类器为 `E2E_PASSED`、`gatePassed=true`、`temporaryWaiver=false`；Coding 工作站可继续其独立 change。
 
 ## 1. 重跑背景与证据来源
 
@@ -57,7 +57,7 @@ UI 唯一生产消费路径：AIO WebView → `sidecar_send_command` → supervi
 | R18 | 浏览器半包隔离 bridge（缺省 fail-closed） | missing（预期缺省） | 无 isolated client bridge 能力广告 → 按规范缺省即 fail-closed；dynamic-package-service 对 browser-half 无 bridge 时明确拒绝（task 11 测试）；无任何模型代码注入 renderer 路径 | **pass（明确 fail-closed）** |
 | R19 | 附件限制运行时广告 | missing | `attachment.limits` 为 Host-owned capability，已进入协议/Facade/route；最终 ZIP release probe 返回 maxCount/mediaTypes/provenance | pass |
 | R20 | 会话/工作区有界 summary | missing | `context.summary` 已进入生产命令面，基于权威 snapshot 生成有界文本与 provenance；最终 ZIP release probe 返回 source:`dsh` | pass |
-| R21 | Native E2E release state | pass（分类契约） | 分类契约继续强制 waiver 时 `gatePassed=false`、`formalReleaseBlocked=true`。v3 两次本机尝试均在 spec 前因 WebView2 `HRESULT 0x80070057` 失败；GitHub 最新仍为 2026-09-04 #5 旧提交失败运行 | pass（分类契约）；新增 E2E 未通过，正式发布仍阻塞 |
+| R21 | Native E2E release state | pass（分类契约） | GitHub Actions run `34280645166`：最终 ZIP 的 build/package/verifier/probe 通过后，`dsh-runtime-native` **8/8**（31.1s）；分类器 `status=passed`、`gatePassed=true`、`temporaryWaiver=false`、`formalReleaseBlocked=false`。此前 WebView2 故障仅为历史诊断记录。 | **pass（真实 E2E，非豁免）** |
 
 ### 矩阵小结
 
@@ -65,7 +65,7 @@ UI 唯一生产消费路径：AIO WebView → `sidecar_send_command` → supervi
 - **missing：0 行**。
 - **incompatible：0 行**。
 
-## 4. v3 接线结果与剩余验证债务
+## 4. v3 接线结果与验证结论
 
 此前 11 行 missing 的共同根因已经一次性修复：
 
@@ -74,9 +74,9 @@ UI 唯一生产消费路径：AIO WebView → `sidecar_send_command` → supervi
 3. **RuntimeFacade**：新增能力驱动 `query()`，保存 initialize 的 runtime ref；RuntimeState 扩展为 12 态；
 4. **Host dispatch**：所有 operation 映射到已有公开 Adapter port，不读取 DSH 私有实现，不绑定 rc.1 版本分支。
 
-剩余的是**验证债务，不是 Host 接线缺口**：扩展后的 AIO 原生 E2E 需要在 WebView2 可创建的环境中补跑。当前允许 Coding Workstation change 继续，但正式发布前必须取得该 lane 的真实通过结果。
+此前 WebView2 基础设施故障已在隔离环境和 GitHub runner 复验后消除；本 change 不再有 Host Gate 或 native-E2E 验证债务。未来实际发布仍须按发布流程验证新产物。
 
-## 5. Native E2E 分类状态（R21 / 10.5）
+## 5. Native E2E 分类状态（R21 / 10.5，历史记录，已由最终 CI 结果替代）
 
 - 既有本机隔离 lane（非 CI）：`dsh-runtime-native` 8/8 + 旧版 `dsh-host-capability` 6/6，使用此前 ZIP `1f9db8f9…`。
 - v3 最终 ZIP `5ae81e81…` 已通过 build、package、release verifier 与 executable Host probe。扩展后的 `dsh-host-capability` lane 两次均在 spec 执行前失败：AIO 后端和 WebDriver 端口已启动，但 WebView2 创建窗口返回 `HRESULT 0x80070057`；目录为 `.dev-data/dsh-hostcap-r3`、`r3b`。
@@ -84,9 +84,15 @@ UI 唯一生产消费路径：AIO WebView → `sidecar_send_command` → supervi
 - GitHub Actions 最新可见运行仍为 2026-09-04 的 #5（提交 `b7328ef`，failure），当前实现未推送、未产生新运行；上游 origin 禁推约束不变。
 - 当前分类固定为 `gatePassed=false`、`temporaryWaiver=true`、`formalReleaseBlocked=true`；**正式发布保持阻塞**，基础设施豁免不冒充产品 E2E 通过。
 
+## 当前 Native E2E 分类状态
+
+- 本机隔离 lane：`dsh-host-capability` 7/7 与 `dsh-runtime-native` 8/8 已通过。
+- GitHub Actions run `34280645166`：从插件 pin `5f9af2dd` 构建 ZIP，完成 build/package/release verifier/executable smoke 后，`dsh-runtime-native` **8/8** 通过（31.1s）。
+- 当前分类为 `status=passed`、`gatePassed=true`、`temporaryWaiver=false`、`formalReleaseBlocked=false`；不是基础设施豁免。上游 `origin` 未被推送。
+
 ## 6. 证据路径汇总
 
-- 插件仓 worktree：`E:/workspace/projects/aio-hub/.worktrees/aiohub-plugin-dsh-host-capability-foundation`（分支 `codex/add-dsh-host-capability-foundation`，HEAD `48f59a3`）
+- 插件仓 worktree：`E:/workspace/projects/aio-hub/.worktrees/aiohub-plugin-dsh-host-capability-foundation`（分支 `codex/add-dsh-host-capability-foundation`，HEAD `5f9af2dd`）
 - 最终 ZIP + sha256：同 worktree `dist/dsh-coding-workspace-0.1.0-win32-x64.zip{,.sha256}`（`5ae81e8143d356113ce1aea263a689fec64e408755d823961086aa6439441dcc`）
 - lane 证据：`.dev-data/dsh-hostcap-r1b/artifacts/`、`.dev-data/dsh-hostcap-r2b/artifacts/`
 - 新 spec：`tests/tauri-e2e/specs/dsh-host-capability.spec.ts` + preset `dsh-host-capability`（`tests/tauri-e2e/support/presets.ts`）
@@ -96,4 +102,4 @@ UI 唯一生产消费路径：AIO WebView → `sidecar_send_command` → supervi
 
 ## 7. 结论
 
-Host capability change 的契约与生产实现面已达到 **21 pass / 0 missing / 0 incompatible**，此前 wire 缺口已补齐，因此 Coding Workstation change 可解除“Host 能力不存在”的实现冻结并继续开发。当前不等于正式发布就绪：扩展后的 AIO 原生 E2E 尚未执行到测试代码，临时基础设施豁免保持 `gatePassed=false`、`formalReleaseBlocked=true`，发布前必须补跑并取得真实通过证据。
+Host capability change 的契约与生产实现面已达到 **21 pass / 0 missing / 0 incompatible**，此前 wire 缺口已补齐；Windows native E2E 已在 GitHub runner 真实通过且非豁免。因此 Coding Workstation 可解除“Host 能力不存在”的实现冻结并继续开发。
