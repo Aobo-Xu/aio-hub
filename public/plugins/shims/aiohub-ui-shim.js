@@ -23,6 +23,7 @@ export const {
   DraggablePanel,
   DropZone,
   DynamicIcon,
+  LlmModelSelector,
 } = UI;
 
 export default UI;

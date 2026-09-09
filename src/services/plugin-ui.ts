@@ -104,3 +104,4 @@ export const RichCodeEditor = components.RichCodeEditor;
 export const DraggablePanel = components.DraggablePanel;
 export const DropZone = components.DropZone;
 export const DynamicIcon = components.DynamicIcon;
+export const LlmModelSelector = components.LlmModelSelector;
