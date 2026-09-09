@@ -1,6 +1,6 @@
 $ bun scripts/e2e.ts tauri --preset dsh-runtime-native
 
-Execution of 1 workers started at 2026-09-08T21:38:20.301Z
+Execution of 1 workers started at 2026-09-09T01:11:00.233Z
 
 [0-0] RUNNING in undefined - file:///D:/a/aio-hub/aio-hub/tests/tauri-e2e/specs/dsh-plugin-release.spec.ts
 [0-0] PASSED in undefined - file:///D:/a/aio-hub/aio-hub/tests/tauri-e2e/specs/dsh-plugin-release.spec.ts
@@ -8,7 +8,7 @@ Execution of 1 workers started at 2026-09-08T21:38:20.301Z
  "spec" Reporter:
 ------------------------------------------------------------------
 [webview unknown windows #0-0] Running: webview (vunknown) on windows
-[webview unknown windows #0-0] Session ID: 73d1ae20-d07b-4899-bca8-5e3083d4ce91
+[webview unknown windows #0-0] Session ID: 43fca2db-953e-4772-aa13-722fae4ff001
 [webview unknown windows #0-0]
 [webview unknown windows #0-0] » tests\tauri-e2e\specs\dsh-plugin-release.spec.ts
 [webview unknown windows #0-0] DSH release plugin
@@ -21,8 +21,8 @@ Execution of 1 workers started at 2026-09-08T21:38:20.301Z
 [webview unknown windows #0-0]    ✓ commits a verified staged upgrade and preserves plugin data
 [webview unknown windows #0-0]    ✓ uninstalls cleanly and preserves plugin data
 [webview unknown windows #0-0]
-[webview unknown windows #0-0] 8 passing (31.1s)
+[webview unknown windows #0-0] 8 passing (30.6s)
 
 
-Spec Files:	 1 passed, 1 total (100% completed) in 00:00:33  
+Spec Files:	 1 passed, 1 total (100% completed) in 00:00:34  
 
