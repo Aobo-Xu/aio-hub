@@ -1,0 +1,20 @@
+{
+  "change": "add-dsh-host-capability-foundation",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "2a79694bc22e61142dc53adf786f05e72e609689f23e0874e93f963cc7e91bf2",
+  "files": [
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/proposal.md", "sha256": "fbdbfceffa7f8b153ba84d799fdd7e18aacdca527d942a89ff35aa6eab9b638b" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/design.md", "sha256": "c289e549d41dfb4d3a86cbc38416870ef969744396914a74dc26d9d43795291e" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/tasks.md", "sha256": "ab2dbc1c93d6bbf4f9a85bf3f0909efa0d7a3728b79d0c6676427a520264ac05" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-execution-bridge/spec.md", "sha256": "7a141d6e68813de3e1fc968a53c47cc4af733487e5923a52f49a467e522f3ce1" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-host-capability-contract/spec.md", "sha256": "a8c320c6db92235c39467784f60216e5d5e73946b19ca282396cf530903a282c" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-host-dynamic-runtime/spec.md", "sha256": "1d4f38a6d05f38fec075b0f74d7173e03d6da36e4a73dc1b6532fe57799bd31f" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-host-interactions-artifacts/spec.md", "sha256": "3ed50534d21709be64314b4d16fa262a1fbd1e7f3fdeff60d9db68d44f22e0b5" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-host-workspace-session/spec.md", "sha256": "042f8164a52e732010433c98512fb8ff40380b25b54fa2a4909a98f165f07dea" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-model-and-prompt-sync/spec.md", "sha256": "165007b2bc04b594f36e5ec6ac708c8bfd24c35b439972e620fea05e7986a599" },
+    { "path": "openspec/changes/add-dsh-host-capability-foundation/specs/dsh-runtime-lifecycle/spec.md", "sha256": "d23f5480d18a311118bda76ce02ee4e5f210906fded17876beacbac654950369" }
+  ]
+}

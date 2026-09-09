@@ -1,9 +1,6 @@
-# dsh-execution-bridge Specification
+# dsh-execution-bridge Specification Delta
 
-## Purpose
-定义 AIO 与 DSH 无头执行域之间的公开桥接边界，使 AIO 能通过稳定、可验证的宿主契约驱动 DSH 会话与执行能力，同时保持 DSH 对执行事实和会话数据的唯一权威。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 公开扩展点上的完整无头执行域
 桥接层 SHALL 作为项目侧 TypeScript/ESM DSH Cordis 插件运行，并由发行版隔离 Adapter 组合 DSH 公开的 Session Controller、Typert Remote、Workspace Controller、SessionPersistence、settings、credentials、prompt、terminal 和交互服务。桥接层 MUST NOT 修改或复制 Agent Loop、DSH Web BFF、会话持久化、上下文压缩、工具策略、审批、沙箱、工作流、Skill、子 Agent，也不得启动 DSH Web UI、导入私有注册表或解析 JSONL。DSH SHALL 始终是执行与会话的唯一权威。
@@ -15,28 +12,6 @@
 #### Scenario: 公开服务缺失
 - **WHEN** 当前 DSH runtime 未提供任一必需公共服务或行为契约
 - **THEN** 桥接拒绝就绪或仅进入明确的权威只读模式，并列出缺失项，不导入私有模块或静默实现替代 Agent 行为
-
-### Requirement: 单一契约源与初始化协商
-Supervisor 与 DSH bridge SHALL 使用 JSONL 帧通信。Rust 协议 crate SHALL 是 schema 的单一编辑源，并生成 JSON Schema 与 TypeScript declarations；CI SHALL 验证生成物和 contract hash。接受会话命令前 MUST 完成 `initialize`，交换协议版本、runtime build/provenance、平台事实，以及默认启用的 stable 与需显式协商的 experimental capability。
-
-#### Scenario: 兼容初始化
-- **WHEN** 两端主版本、contract hash 和必需 stable capabilities 兼容
-- **THEN** 系统返回协商后的能力集合并接受仅属于该集合的命令
-
-#### Scenario: 契约不兼容
-- **WHEN** 主版本、contract hash 或必需 capability 不兼容
-- **THEN** 系统拒绝执行域就绪，保留最后可用 runtime，并返回结构化诊断
-
-### Requirement: 控制租约与代际栅栏
-每个 DSH session SHALL 同时最多有一个可变 controller lease，并 MAY 有多个只读 observer。控制权转移 MUST 显式执行。所有可变命令和交互响应 MUST 携带当前 `domainGenerationId` 与 `leaseId`；每条帧还 SHALL 携带协议版本、单调连接序号，以及可用的 DSH `sessionId`、Turn、step、tool call、job 或 sub-agent 标识。
-
-#### Scenario: 第二个窗口打开同一会话
-- **WHEN** 一个 session 已有 controller 而另一 AIO 视图打开它
-- **THEN** 新视图只获得 observer 权限，除非当前 controller 显式转移或释放租约
-
-#### Scenario: 迟到写操作
-- **WHEN** 命令携带旧 `domainGenerationId` 或过期 `leaseId`
-- **THEN** Supervisor 拒绝该命令且不触达 DSH
 
 ### Requirement: 完整会话控制契约
 桥接 SHALL 维持一个可承载多个 Workspace 与 Session 的长期 DSH Host，并通过版本化、类型化命令提供创建、列出、全局搜索、打开、恢复、分页历史、提交 Prompt、取消、steer、队列新增/编辑/移除、重启、分叉、重命名、归档、恢复归档、删除、模型选择和工作区关联能力；每项能力 SHALL 映射到 DSH 公共控制服务并独立协商。DSH durable session 与日志是执行事实源，AIO 只保存引用、draft 和 UI 偏好。
@@ -82,10 +57,3 @@ DSH 的 durable events、开始/完成事实和由官方控制面读取的真实
 #### Scenario: 请求在响应前失效
 - **WHEN** Turn 取消、租约转移、执行域重启或 DSH 撤回 interaction
 - **THEN** 所有观察视图收到 resolved 通知，迟到响应被拒绝且不得作用到新请求
-
-### Requirement: 可迁移的 RuntimeFacade
-AIO UI SHALL 只依赖插件本地、无 Vue/Pinia 类型的 `RuntimeFacade` 和版本化 DTO。Facade SHALL 以稳定 capability id `execution-domain:dsh` 描述执行域，并保持可被未来 AIO 全局 Capability Runtime 注册或替换；它 MUST NOT 替换或冒充 AIO RP-first `conversation-runtime:default`。
-
-#### Scenario: 未来接入全局 Capability Runtime
-- **WHEN** AIO 后续提供全局 capability registry
-- **THEN** 适配器可注册现有 Facade，而无需修改 Supervisor/bridge 协议、DSH session 事实或 UI DTO
